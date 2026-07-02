@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" href="data:,">
+  <title>30 Or Less — IT Service Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            iron:  { 950: '#0b0a08', 900: '#141210', 800: '#1e1b18', 700: '#2b2722' },
+            ember: { 400: '#fb923c', 500: '#f97316', 600: '#ea580c' },
+            ash:   { 300: '#d6d3d1', 400: '#a8a29e', 500: '#78716c' }
+          },
+          fontFamily: {
+            sans: ['Space Grotesk', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/css/app.css?v=4">
+  <script src="/static/js/app.js?v=9"></script>
+</head>
+<body x-data="app()" x-cloak x-init="init()">
+
+  <!-- Connection Status Banner -->
+  <div x-show="isOffline" x-transition class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] w-full max-w-md px-4" style="display: none;">
+    <div class="bg-red-500/15 backdrop-blur-md border border-red-500/30 text-red-200 px-4 py-3 rounded-xl shadow-lg flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="flex h-2 w-2 relative">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+        </span>
+        <span class="text-sm font-medium">Server is offline or restarting. Retrying...</span>
+      </div>
+      <button @click="isOffline = false" class="text-red-300 hover:text-white transition-colors text-xs font-semibold focus:outline-none">
+        Dismiss
+      </button>
+    </div>
+  </div>
+
+  
+  <div x-show="!auth.isAuthenticated" style="display:none;" :style="!auth.isAuthenticated ? 'display:block' : ''">
+    <div class="fixed inset-0 z-[9999] bg-[var(--bg)] flex flex-col items-center justify-center">
+      <div class="bg-[var(--surface)] p-10 rounded-lg border border-[var(--border2)] w-80 text-center">
+        <h2 class="mb-2 font-semibold text-xl tracking-tight text-[var(--text)]" x-text="auth.shopName || 'OpenBench'"></h2>
+        <p class="text-[var(--textdim)] mb-6 text-sm" x-text="auth.hasPin ? 'Enter PIN to unlock' : 'Create a 6-digit PIN for the Owner account'"></p>
+        
+        <form @submit.prevent="submitPin()">
+          <input x-show="!auth.hasPin" type="text" x-model="auth.setupLabel" placeholder="Your Name" class="w-full text-center p-3 mb-4 bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] rounded-xl outline-none focus:border-[var(--blue)] transition-all" :required="!auth.hasPin">
+          
+          <input type="password" x-model="auth.pinInput" placeholder="••••••" minlength="6" maxlength="6" pattern="\d{6}" inputmode="numeric" title="6-digit PIN" class="w-full text-center text-2xl tracking-[0.5em] p-3 mb-4 bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] rounded-xl outline-none focus:border-[var(--blue)] focus:ring-1 focus:ring-[var(--blue)] transition-all shadow-inner" autofocus required>
+          
+          <div class="text-[var(--red)] text-sm mb-4 min-h-[20px] font-medium" x-text="auth.error"></div>
+          
+          <button type="submit" class="btn btn-primary w-full py-3">
+            <span x-text="auth.hasPin ? 'Unlock' : 'Set PIN & Unlock'"></span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="auth.isAuthenticated" style="display:none;" :style="auth.isAuthenticated ? 'display:block' : ''">
+
+  <!-- ── Top bar ───────────────────────────────────────────────────────────── -->
+  <div id="topbar">
+    <div class="brand">
+      <button class="anvil" title="strike while the iron is hot"
+        @click="$el.classList.remove('struck'); void $el.offsetWidth; $el.classList.add('struck')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 7h16c0 3-3 5-6 5h-1v4h3v2H8v-2h3v-4h-1c-3 0-6-2-6-5z"/>
+        </svg>
+        <span class="spark" style="--sx:-10px; --sy:-14px"></span>
+        <span class="spark" style="--sx:10px; --sy:-16px"></span>
+        <span class="spark" style="--sx:-14px; --sy:-6px"></span>
+        <span class="spark" style="--sx:14px; --sy:-8px"></span>
+      </button>
+      <span class="brand-name text-lg tracking-tight" x-text="config?.shop_name || 'OpenBench'"></span>
+      <span class="ml-4 text-[13px] text-[var(--subtle)] font-mono" x-text="currentTime"></span>
+    </div>
+    <div class="tab-strip">
+      <button class="tab" :class="page==='home' && 'active'" @click="page='home'">Home</button>
+      <template x-for="p in plugins" :key="p.id">
+        <button class="tab" :class="page === p.id && 'active'" @click="page = p.id; if (p.onFocus) p.onFocus()">
+          <span x-text="p.name"></span>
+        </button>
+      </template>
+      <button class="tab" :class="page==='customers' && 'active'" @click="page='customers'; fetchCustomers()">Customers</button>
+      <button class="tab" :class="page==='settings' && 'active'" @click="page='settings'; fetchBackups()">Settings</button>
+      <div class="h-5 w-px bg-[var(--border)] mx-2"></div>
+      <div class="flex items-center gap-2 pl-2">
+        <span class="text-[12px] font-medium text-[var(--textdim)]" x-text="auth.user?.name || 'User'"></span>
+        <button class="btn btn-ghost btn-sm py-1 px-2" @click="logout()" title="Log Out">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.72 0"/>
+            <line x1="12" y1="2" x2="12" y2="12" stroke="var(--accent)"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── Main ───────────────────────────────────────────────────────────────── -->
+  <div id="main">
+
+    <!-- ════════════════════════════════════════════════════════════════════
+             HOME TAB
+        ═════════════════════════════════════════════════════════════════════ -->
+    <div x-show="page === 'home'" x-cloak class="space-y-6">
+      <!-- Hero card / Greeting -->
+      <div class="relative overflow-hidden bg-[var(--surface)] border border-[var(--border)] rounded-lg p-8 min-h-[180px] flex flex-col justify-between transition-all duration-300 hover:border-[var(--accent-deep)]">
+        <!-- Ember particles rising from the forge -->
+        <div class="ember-particles" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+
+        <div class="relative z-10">
+          <div class="text-xs font-mono text-[var(--blue)] uppercase tracking-wider mb-2 font-medium" x-text="new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })"></div>
+          <h1 class="text-3xl font-bold tracking-tight text-[var(--text)] mb-2" x-text="getGreeting()"></h1>
+          <p class="text-sm text-[var(--textdim)] max-w-xl leading-relaxed">
+            Welcome back to <span class="text-[var(--text)] font-semibold" x-text="config?.shop_name || 'OpenBench'"></span>. Here is a status check of your workbench and service center operations.
+          </p>
+        </div>
+
+        <div class="relative z-10 flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-[var(--border)] text-[var(--textdim)] text-xs font-mono">
+          <div class="flex items-center gap-2">
+            <span class="status-dot"></span>
+            <span>System Active</span>
+          </div>
+          <div>
+            <span>Role: </span>
+            <span class="text-[var(--text)] uppercase font-semibold" x-text="auth.user?.role || 'User'"></span>
+          </div>
+          <div x-text="'Local Time: ' + currentTime"></div>
+        </div>
+      </div>
+
+      <!-- Content Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Quick Actions Column -->
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+            <span class="font-semibold text-[var(--text)] tracking-tight text-sm uppercase">Quick Navigation</span>
+          </div>
+          <div class="flex flex-col gap-3">
+            <button @click="panel = 'new'" class="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] hover:border-[var(--accent-deep)] transition-all text-left group">
+              <div class="w-10 h-10 rounded-lg bg-[var(--surface2)] flex items-center justify-center text-[var(--textdim)] group-hover:text-[var(--text)] transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12" stroke="var(--accent)"/>
+                </svg>
+              </div>
+              <div>
+                <div class="font-semibold text-[var(--text)] text-sm group-hover:text-[var(--accent-hot)] transition-colors">New Repair Ticket</div>
+                <div class="text-[var(--textdim)] text-xs mt-0.5">Register a new customer device</div>
+              </div>
+            </button>
+
+            <button @click="page = 'repair-tickets'" class="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] hover:border-[var(--accent-deep)] transition-all text-left group">
+              <div class="w-10 h-10 rounded-lg bg-[var(--surface2)] flex items-center justify-center text-[var(--textdim)] group-hover:text-[var(--text)] transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.59 13.41 13.4 20.6a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82z"/>
+                  <circle cx="7.5" cy="7.5" r="1" stroke="var(--accent)"/>
+                </svg>
+              </div>
+              <div>
+                <div class="font-semibold text-[var(--text)] text-sm group-hover:text-[var(--accent-hot)] transition-colors">Manage Tickets</div>
+                <div class="text-[var(--textdim)] text-xs mt-0.5">View active and completed repairs</div>
+              </div>
+            </button>
+
+            <button @click="page = 'customers'; fetchCustomers()" class="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] hover:border-[var(--accent-deep)] transition-all text-left group">
+              <div class="w-10 h-10 rounded-lg bg-[var(--surface2)] flex items-center justify-center text-[var(--textdim)] group-hover:text-[var(--text)] transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="var(--accent)"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="var(--accent)"/>
+                </svg>
+              </div>
+              <div>
+                <div class="font-semibold text-[var(--text)] text-sm group-hover:text-[var(--accent-hot)] transition-colors">Customers Directory</div>
+                <div class="text-[var(--textdim)] text-xs mt-0.5">Search database of contact profiles</div>
+              </div>
+            </button>
+
+            <button @click="page = 'settings'; fetchBackups()" class="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] hover:border-[var(--accent-deep)] transition-all text-left group">
+              <div class="w-10 h-10 rounded-lg bg-[var(--surface2)] flex items-center justify-center text-[var(--textdim)] group-hover:text-[var(--text)] transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                  <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                  <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+                  <line x1="1" y1="14" x2="7" y2="14"/>
+                  <line x1="9" y1="8" x2="15" y2="8" stroke="var(--accent)"/>
+                  <line x1="17" y1="16" x2="23" y2="16"/>
+                </svg>
+              </div>
+              <div>
+                <div class="font-semibold text-[var(--text)] text-sm group-hover:text-[var(--accent-hot)] transition-colors">System Settings</div>
+                <div class="text-[var(--textdim)] text-xs mt-0.5">Configure preferences and backups</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metrics Column -->
+        <div class="lg:col-span-2 flex flex-col gap-4">
+          <div class="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+            <span class="font-semibold text-[var(--text)] tracking-tight text-sm uppercase">Shop Overview Metrics</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Active Tickets Card -->
+            <div class="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm flex flex-col justify-between h-[130px] hover:border-[var(--border2)] transition-all">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-[var(--textdim)] mb-1">Open Repairs</div>
+                <div class="text-3xl font-bold text-[var(--blue)]" x-text="stats.open ?? '0'"></div>
+              </div>
+              <div class="text-xs text-[var(--textdim)]">
+                Currently in queue or diagnostic phase.
+              </div>
+            </div>
+
+            <!-- Overdue Card -->
+            <div class="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm flex flex-col justify-between h-[130px] hover:border-[var(--border2)] transition-all">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-[var(--textdim)] mb-1">Overdue Repairs</div>
+                <div class="text-3xl font-bold text-[var(--red)]" x-text="stats.overdue ?? '0'"></div>
+              </div>
+              <div class="text-xs text-[var(--textdim)]">
+                Past their scheduled completion date.
+              </div>
+            </div>
+
+            <!-- Due Today Card -->
+            <div class="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm flex flex-col justify-between h-[130px] hover:border-[var(--border2)] transition-all">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-[var(--textdim)] mb-1">Due Today</div>
+                <div class="text-3xl font-bold text-[var(--yellow)]" x-text="stats.due_today ?? '0'"></div>
+              </div>
+              <div class="text-xs text-[var(--textdim)]">
+                Scheduled for delivery by end of day.
+              </div>
+            </div>
+
+            <!-- Revenue Card -->
+            <div class="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm flex flex-col justify-between h-[130px] hover:border-[var(--border2)] transition-all">
+              <div>
+                <div class="text-[10px] font-mono uppercase tracking-wider text-[var(--textdim)] mb-1">Revenue (Week)</div>
+                <div class="text-3xl font-bold text-[var(--green)]" x-text="stats.revenue ?? '—'"></div>
+              </div>
+              <div class="text-xs text-[var(--textdim)]">
+                Calculated from completed tickets.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="plugin-views">
+      <template x-for="pview in pluginViews" :key="pview.id">
+        <div x-show="page === pview.id" x-html="pview.html"></div>
+      </template>
+    </div>
+<!-- ════════════════════════════════════════════════════════════════════
+         SETTINGS TAB
+    ═════════════════════════════════════════════════════════════════════ -->
+    <div x-show="page === 'settings'">
+      <div class="section-head">
+        <span class="section-title">System Settings</span>
+      </div>
+
+      <div class="settings-layout">
+        <!-- Sidebar -->
+        <div class="settings-sidebar">
+          <button class="tab" :class="settingsTab === 'profile' && 'active'" @click="settingsTab = 'profile'">Business Profile</button>
+          <button class="tab" :class="settingsTab === 'security' && 'active'" @click="settingsTab = 'security'">Security & Users</button>
+          <button class="tab" :class="settingsTab === 'backups' && 'active'" @click="settingsTab = 'backups'">Backups</button>
+          <button class="tab" :class="settingsTab === 'prefs' && 'active'" @click="settingsTab = 'prefs'">Preferences</button>
+          <button class="tab" :class="settingsTab === 'export' && 'active'" @click="settingsTab = 'export'">Data Export</button>
+          <button class="tab" :class="settingsTab === 'danger' && 'active'" @click="settingsTab = 'danger'">Danger Zone</button>
+        </div>
+
+        <!-- Content Area -->
+        <div class="settings-content">
+          
+          <!-- Profile -->
+          <div class="settings-content-section" :class="settingsTab === 'profile' && 'active'">
+            <div class="form-section">
+              <div class="form-section-title">Business Information</div>
+              <div class="form-grid form-grid-2">
+                <div class="field">
+                  <label>Shop Name</label>
+                  <input type="text" x-model="config.shop_name" @change="saveConfig()">
+                </div>
+                <div class="field">
+                  <label>Tagline</label>
+                  <input type="text" x-model="config.shop_tagline" @change="saveConfig()">
+                </div>
+                <div class="field">
+                  <label>Phone</label>
+                  <input type="text" x-model="config.shop_phone" @change="saveConfig()">
+                </div>
+                <div class="field">
+                  <label>Email</label>
+                  <input type="email" x-model="config.shop_email" @change="saveConfig()">
+                </div>
+                <div class="field col-span-2">
+                  <label>Address</label>
+                  <input type="text" x-model="config.shop_address" @change="saveConfig()">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Tax & Currency</div>
+              <div class="form-grid form-grid-3">
+                <div class="field">
+                  <label>Currency Symbol</label>
+                  <input type="text" x-model="config.currency_symbol" @change="saveConfig()">
+                </div>
+                <div class="field">
+                  <label>Tax Label</label>
+                  <input type="text" x-model="config.tax_label" @change="saveConfig()">
+                </div>
+                <div class="field">
+                  <label>Tax Rate (%)</label>
+                  <input type="number" step="0.01" x-model="config.tax_rate" @change="saveConfig()">
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-section">
+              <div class="form-section-title">Invoice Customization</div>
+              <div class="field">
+                <label>Invoice Footer Notes</label>
+                <textarea x-model="config.invoice_footer" @change="saveConfig()" rows="2"></textarea>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Email Templates</div>
+              <p class="text-[var(--textdim)] mb-4 text-[13px]">Available placeholders: [CUSTOMER_NAME], [TICKET_ID], [DEVICE], [STATUS], [PRICE]</p>
+              <template x-for="(tmpl, idx) in emailTemplates" :key="idx">
+                <div class="template-card">
+                  <div class="font-medium text-[var(--text)] mb-3" x-text="tmpl.name"></div>
+                  <div class="field mb-3">
+                    <label>Subject</label>
+                    <input type="text" x-model="tmpl.subject" @change="saveEmailTemplates()">
+                  </div>
+                  <div class="field">
+                    <label>Body</label>
+                    <textarea x-model="tmpl.body" rows="6" class="font-mono text-[12px] leading-relaxed whitespace-pre" @change="saveEmailTemplates()"></textarea>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="settings-content-section" :class="settingsTab === 'security' && 'active'">
+            <div class="form-section">
+              <div class="flex justify-between items-center mb-4">
+                <div class="form-section-title !mb-0">Access PINs</div>
+                <button class="btn btn-primary btn-sm" @click="showAddPin = !showAddPin" x-show="auth.user?.role === 'owner'">+ Add User</button>
+              </div>
+              
+              <div x-show="auth.user?.role !== 'owner'" class="text-[var(--textdim)] text-[13px] mb-4">
+                Only the Owner can manage user access.
+              </div>
+              
+              <div class="data-table-wrap" x-show="auth.user?.role === 'owner'">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name / Label</th>
+                      <th>Role</th>
+                      <th>Added On</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="p in pinsList" :key="p.id">
+                      <tr>
+                        <td class="tname" x-text="p.label"></td>
+                        <td><span class="badge" :class="p.role === 'owner' ? 'badge-open' : 'badge-completed'" x-text="p.role"></span></td>
+                        <td class="tdim text-[12px]" x-text="new Date(p.created).toLocaleDateString()"></td>
+                        <td>
+                          <button class="btn btn-ghost btn-sm" @click="deletePin(p.id)" :disabled="p.role === 'owner' && pinsList.filter(x => x.role === 'owner').length === 1">Remove</button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              
+              <!-- Add PIN Form (inline) -->
+              <div x-show="showAddPin" class="mt-4 p-4 border border-[var(--border)] rounded-lg bg-[var(--bg)]">
+                <div class="form-grid form-grid-3 items-end">
+                  <div class="field">
+                    <label>Name</label>
+                    <input type="text" x-model="newPin.label" placeholder="e.g. David">
+                  </div>
+                  <div class="field">
+                    <label>Role</label>
+                    <select x-model="newPin.role">
+                      <option value="technician">Technician</option>
+                      <option value="owner">Owner</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>6-Digit PIN</label>
+                    <input type="password" x-model="newPin.pin" placeholder="••••••" minlength="6" maxlength="6" pattern="\d{6}" inputmode="numeric" title="6-digit PIN" required>
+                  </div>
+                </div>
+                <div class="flex gap-2 mt-4">
+                  <button class="btn btn-primary btn-sm" @click="addPin()">Save PIN</button>
+                  <button class="btn btn-ghost btn-sm" @click="showAddPin = false">Cancel</button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-section">
+              <div class="form-section-title">Session Management</div>
+              <div class="flex items-center justify-between">
+                <div class="text-[13px] text-[var(--textdim)]">
+                  Active Sessions: <strong class="text-[var(--text)]" x-text="systemInfo?.active_sessions || 1"></strong>
+                </div>
+                <button class="btn btn-ghost btn-sm" @click="revokeOtherSessions()" x-show="auth.user?.role === 'owner'">Log Out Other Devices</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Backups -->
+          <div class="settings-content-section" :class="settingsTab === 'backups' && 'active'">
+            <div class="form-section">
+              <div class="form-section-title">Automated Backups</div>
+              <div class="form-grid form-grid-2 mb-4">
+                <div class="field">
+                  <label>Frequency</label>
+                  <select x-model="config.backup_frequency" @change="saveConfig()">
+                    <option value="Off">Off</option>
+                    <option value="Every 6 Hours">Every 6 Hours</option>
+                    <option value="Every 12 Hours">Every 12 Hours</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Retention (Days)</label>
+                  <input type="number" min="1" x-model="config.backup_retention_days" @change="saveConfig()">
+                </div>
+                <div class="field col-span-2">
+                  <label>Custom Backup Directory (Server Path)</label>
+                  <input type="text" x-model="config.backup_directory" @change="saveConfig()" placeholder="Leave empty for default (data/backups)">
+                </div>
+              </div>
+              <div class="text-[12px] text-[var(--textdim)] bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)]">
+                <strong>Next Auto-Backup:</strong> <span x-text="config.backup_frequency !== 'Off' ? 'Scheduled based on frequency' : 'Disabled'"></span><br>
+                <strong>Last Run:</strong> <span x-text="backupInfo?.last_run ? (backupInfo.last_run === 'Never' ? 'Never' : new Date(backupInfo.last_run).toLocaleString()) : 'Never'"></span>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="flex justify-between items-center mb-4">
+                <div class="form-section-title !mb-0">Backup Archives</div>
+                <div class="flex gap-2">
+                  <label class="btn btn-ghost btn-sm cursor-pointer relative overflow-hidden">
+                    <span>Upload & Restore .zip</span>
+                    <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".zip" @change="restoreBackup($event)">
+                  </label>
+                  <button class="btn btn-primary btn-sm" @click="createBackup()">Create Manual Backup</button>
+                </div>
+              </div>
+              
+              <div class="data-table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Filename</th>
+                      <th>Created</th>
+                      <th>Size</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-if="backups.length === 0">
+                      <tr><td colspan="4"><div class="empty-state py-8"><p>No backups found.</p></div></td></tr>
+                    </template>
+                    <template x-for="b in backups" :key="b.filename">
+                      <tr>
+                        <td class="mono text-[12px]" x-text="b.filename"></td>
+                        <td class="tdim" x-text="new Date(b.created).toLocaleString()"></td>
+                        <td class="tdim mono text-[11px]" x-text="(b.size / 1024).toFixed(1) + ' KB'"></td>
+                        <td>
+                          <a :href="'/api/settings/backups/download/' + b.filename" class="btn btn-ghost btn-sm" download>Download</a>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preferences -->
+          <div class="settings-content-section" :class="settingsTab === 'prefs' && 'active'">
+            <div class="form-section">
+              <div class="form-section-title">Display & Locale</div>
+              <div class="form-grid form-grid-2">
+                <div class="field">
+                  <label>Time Zone</label>
+                  <select x-model="config.timezone" @change="saveConfig()">
+                    <option value="America/New_York">Eastern Time (ET)</option>
+                    <option value="America/Chicago">Central Time (CT)</option>
+                    <option value="America/Denver">Mountain Time (MT)</option>
+                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                    <option value="America/Anchorage">Alaska Time (AKT)</option>
+                    <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
+                    <option value="UTC">UTC</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Time Format</label>
+                  <select x-model="config.time_format" @change="saveConfig()">
+                    <option value="12h">12-Hour (AM/PM)</option>
+                    <option value="24h">24-Hour (Military)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Display Density</label>
+                  <select x-model="config.display_density" @change="saveConfig(); applyDensity()">
+                    <option value="comfortable">Comfortable</option>
+                    <option value="compact">Compact</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Accent Theme</label>
+                  <select x-model="accentColor" @change="applyAccentColor()">
+                    <option value="#f97316">Ember</option>
+                    <option value="#ef4444">Flame</option>
+                    <option value="#eab308">Brass</option>
+                    <option value="#38bdf8">Cold Steel</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-section">
+              <div class="form-section-title">Keyboard Shortcuts</div>
+              <div class="grid grid-cols-2 gap-4 text-[13px] text-[var(--subtle)]">
+                <div class="flex justify-between p-2 bg-[var(--bg)] rounded border border-[var(--border)]">
+                  <span>New Ticket</span>
+                  <kbd class="mono text-[var(--text)] bg-[var(--surface)] px-1 rounded border border-[var(--border)]">Ctrl + N</kbd>
+                </div>
+                <div class="flex justify-between p-2 bg-[var(--bg)] rounded border border-[var(--border)]">
+                  <span>Close Panel</span>
+                  <kbd class="mono text-[var(--text)] bg-[var(--surface)] px-1 rounded border border-[var(--border)]">Esc</kbd>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-section" x-show="systemInfo">
+              <div class="form-section-title">System Info</div>
+              <div class="text-[12px] text-[var(--textdim)] font-mono leading-relaxed bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)]">
+                App Version: <span class="text-[var(--text)]" x-text="systemInfo?.version"></span><br>
+                Python: <span class="text-[var(--text)]" x-text="systemInfo?.python_version"></span><br>
+                Database Size: <span class="text-[var(--text)]" x-text="systemInfo?.db_size ? (systemInfo.db_size / 1024 / 1024).toFixed(2) + ' MB' : '0 MB'"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export -->
+          <div class="settings-content-section" :class="settingsTab === 'export' && 'active'">
+            <div class="form-section">
+              <div class="form-section-title">Full Data Export</div>
+              <p class="text-[var(--textdim)] mb-4 text-[13px]">
+                Download a complete ZIP archive of all business data, including tickets, customers, inventory, expenses, and settings.
+              </p>
+              <button class="btn btn-primary" @click="exportAllData()">Download Full Archive (.zip)</button>
+            </div>
+            
+            <div class="form-section">
+              <div class="form-section-title">Module Exports</div>
+              <p class="text-[var(--textdim)] mb-4 text-[13px]">
+                Download individual data tables as CSV files.
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <button class="btn btn-ghost" @click="exportModule('tickets')">Tickets (.csv)</button>
+                <button class="btn btn-ghost" @click="exportModule('customers')">Customers (.csv)</button>
+                <button class="btn btn-ghost" @click="exportModule('parts')">Inventory Parts (.csv)</button>
+                <button class="btn btn-ghost" @click="exportModule('vendors')">Vendors (.csv)</button>
+                <button class="btn btn-ghost" @click="exportModule('devices')">Buy/Sell Devices (.csv)</button>
+                <button class="btn btn-ghost" @click="exportModule('expenses')">Expenses (.csv)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danger Zone -->
+          <div class="settings-content-section" :class="settingsTab === 'danger' && 'active'">
+            <div x-show="auth.user?.role !== 'owner'" class="form-section danger-zone">
+              <div class="form-section-title">Danger Zone</div>
+              <p class="text-[var(--textdim)] text-[13px]">Only the Owner can access destructive actions.</p>
+            </div>
+            
+            <div x-show="auth.user?.role === 'owner'">
+              <div class="form-section danger-zone mb-6">
+                <div class="form-section-title">Reset Specific Module</div>
+                <p class="text-[var(--textdim)] mb-4 text-[13px]">
+                  Clear all data for a specific module. This action cannot be undone.
+                </p>
+                <div class="flex gap-3 mb-4">
+                  <select class="bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] p-2 rounded" x-model="dangerModule">
+                    <option value="">-- Select Module --</option>
+                    <option value="customers">Customers</option>
+                    <!-- Dynamically loaded plugins -->
+                    <template x-for="p in plugins" :key="p.id">
+                      <option :value="p.id" x-text="p.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div x-show="dangerModule" class="p-3 bg-[var(--bg)] border border-[var(--red)] rounded mb-4">
+                  <p class="text-[12px] text-[var(--red)] mb-2">Type <strong class="select-all">DELETE</strong> to confirm.</p>
+                  <div class="flex gap-2">
+                    <input type="text" x-model="dangerModuleConfirm" placeholder="DELETE" class="bg-[var(--surface)] border border-[var(--border)] px-2 py-1 rounded text-sm w-32">
+                    <button class="btn btn-danger btn-sm" @click="resetModule()" :disabled="dangerModuleConfirm !== 'DELETE'">Clear Module Data</button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="form-section danger-zone">
+                <div class="form-section-title">Factory Reset</div>
+                <p class="text-[var(--textdim)] mb-4 text-[13px]">
+                  Wipes the entire database, removes all PINs, and restores factory defaults. You will be logged out.
+                </p>
+                <div class="p-3 bg-[var(--bg)] border border-[var(--red)] rounded">
+                  <p class="text-[12px] text-[var(--red)] mb-2">Type <strong class="select-all">DELETE EVERYTHING</strong> to confirm.</p>
+                  <div class="flex gap-2">
+                    <input type="text" x-model="dangerAllConfirm" placeholder="DELETE EVERYTHING" class="bg-[var(--surface)] border border-[var(--border)] px-2 py-1 rounded text-sm w-48">
+                    <button class="btn btn-danger btn-sm" @click="resetAllData()" :disabled="dangerAllConfirm !== 'DELETE EVERYTHING'">NUKE DATABASE</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+    <div x-show="page === 'customers'">
+      <div class="section-head">
+        <span class="section-title">Customers</span>
+      </div>
+      <div class="toolbar">
+        <input class="search-box" x-model="custSearch"
+          @input.debounce.300ms="fetchCustomers()"
+          type="text" placeholder="Search name, phone, email…" />
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Since</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="customers.length === 0">
+              <tr><td colspan="4">
+                <div class="empty-state">
+                  <div class="empty-icon"></div>
+                  <p>No customers yet — they're added automatically when a ticket is created.</p>
+                </div>
+              </td></tr>
+            </template>
+            <template x-for="c in customers" :key="c.id">
+              <tr @click="openCustomer(c)">
+                <td class="tname" x-text="c.name"></td>
+                <td class="tdim mono text-[12px]" x-text="c.phone"></td>
+                <td class="tdim" x-text="c.email || '—'"></td>
+                <td class="tdim text-[12px]" x-text="c.created || '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       CUSTOMER DETAIL PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'customer'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content w-[600px]">
+      <div class="panel-head">
+        <div>
+          <span class="panel-title" x-text="activeCustomer ? activeCustomer.name : 'Customer'"></span>
+        </div>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+
+      <div class="panel-body" x-show="activeCustomer">
+        <!-- Stats -->
+        <div class="mini-stats mb-6 grid-cols-3">
+          <div class="mini-stat">
+            <div class="mv text-[var(--blue)]" x-text="custStats.total || 0"></div>
+            <div class="ml">Total Tickets</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mv text-[var(--green)]" x-text="custStats.completed || 0"></div>
+            <div class="ml">Completed</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mv text-[var(--green)]" x-text="custStats.revenue || '$0.00'"></div>
+            <div class="ml">Total Spend</div>
+          </div>
+        </div>
+
+        <div class="info-grid mb-4">
+          <div class="info-item">
+            <div class="lbl">Phone</div>
+            <div class="val mono" x-text="activeCustomer && activeCustomer.phone"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Email</div>
+            <div class="val" x-text="(activeCustomer && activeCustomer.email) || '—'"></div>
+          </div>
+          <div class="info-item col-span-2">
+            <div class="lbl">Address</div>
+            <div class="val" x-text="(activeCustomer && activeCustomer.address) || '—'"></div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Internal Notes -->
+        <div class="form-section">
+          <div class="form-section-title">Customer Relationship Notes</div>
+          <template x-if="activeCustomer">
+            <div>
+              <textarea x-model="activeCustomer.notes" rows="3" 
+                placeholder="Special requests, history, or preferences..."
+                class="w-full bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] p-3 rounded-lg text-sm focus:border-[var(--blue)] focus:ring-1 focus:ring-[var(--blue)] transition-all outline-none"></textarea>
+              <button class="btn btn-ghost btn-sm mt-3" @click="saveCustomerNotes()">Save Notes</button>
+            </div>
+          </template>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Repair History -->
+        <div class="text-[11px] text-[var(--subtle)] uppercase tracking-wider mb-3 font-semibold">Repair History</div>
+        <div class="data-table-wrap">
+          <table class="data-table text-xs">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Device</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="t in custTickets" :key="t.id">
+                <tr @click="openTicket(t)">
+                  <td class="mono" x-text="t.id"></td>
+                  <td x-text="t.device"></td>
+                  <td>
+                    <span class="badge" :class="badgeClass(t.status)" x-text="t.status"></span>
+                  </td>
+                  <td class="tdim mono" x-text="t.created"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       EMAIL COMPOSER PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'email'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content w-[640px]">
+      <div class="panel-head">
+        <span class="panel-title">Compose Message</span>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+      <div class="panel-body">
+        <div class="form-section">
+          <div class="form-section-title">01. Select Template</div>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="(tmpl, idx) in emailTemplates" :key="idx">
+              <button class="btn btn-ghost btn-sm"
+                :class="emailTmpl === idx ? 'bg-[var(--blue)] text-white border-[var(--blue-dim)] shadow-[var(--shadow-sm)]' : ''"
+                @click="selectEmailTemplate(idx)" x-text="tmpl.name"></button>
+            </template>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">02. Review Message</div>
+          <div class="field mb-3">
+            <label>Recipient</label>
+            <input type="text" readonly :value="activeTicket?.email" class="opacity-60 bg-[var(--surface2)]" />
+          </div>
+          <div class="field mb-3">
+            <label>Subject</label>
+            <input type="text" x-model="emailForm.subject" />
+          </div>
+          <div class="field">
+            <label>Body</label>
+            <textarea x-model="emailForm.body" rows="10" class="font-mono text-[12px] leading-relaxed"></textarea>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button class="btn btn-primary" @click="sendEmail()">Open in Mail Client ️</button>
+          <button class="btn btn-ghost" @click="panel='ticket'">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="plugin-panels">
+    <template x-for="(phtml, idx) in pluginPanels" :key="idx">
+      <div x-html="phtml"></div>
+    </template>
+  </div>
+
+  <!-- ── Toast ─────────────────────────────────────────────────────────────── -->
+  <div id="toast" :class="['hidden', toastType]" x-text="toastMsg" x-show="toastVisible"
+    x-cloak></div>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       APP SCRIPT
+  ═══════════════════════════════════════════════════════════════════════════ -->
+</body>
+</html>

@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+reportlab
+google-auth
+google-auth-oauthlib
+google-api-python-client
+python-multipart
+qrcode[pil]
+bcrypt
