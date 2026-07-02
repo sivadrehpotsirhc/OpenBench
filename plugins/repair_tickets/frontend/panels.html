@@ -1,0 +1,707 @@
+<!-- ════════════════════════════════════════════════════════════════════════
+       TICKET DETAIL / EDIT PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'ticket'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content drawer">
+      <div class="panel-head">
+        <div>
+          <span class="panel-title" x-text="activeTicket ? activeTicket.id : 'Ticket'"></span>
+          <span class="badge ml-2" :class="activeTicket ? badgeClass(activeTicket.status) : ''"
+            style="margin-left:8px" x-text="activeTicket ? activeTicket.status : ''"></span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" @click="printLabel()" x-show="activeTicket">
+            ️ Label
+          </button>
+          <button class="btn btn-ghost btn-sm" @click="openEmailComposer()" x-show="activeTicket">
+            ️ Email
+          </button>
+          <div class="dropdown" x-data="{ open: false }" @click.away="open = false">
+            <button class="btn btn-ghost btn-sm" @click="open = !open" x-show="activeTicket">
+               Calendar ▾
+            </button>
+            <div class="dropdown-menu" x-show="open" x-cloak style="position:absolute; right:0; top:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:4px; z-index:20; width:140px;">
+              <button class="btn-ghost tdim" style="width:100%; text-align:left; padding:6px 10px;" @click="openCalendarLink('google')">Google Calendar</button>
+              <button class="btn-ghost tdim" style="width:100%; text-align:left; padding:6px 10px;" @click="openCalendarLink('outlook')">Outlook / Live</button>
+              <button class="btn-ghost tdim" style="width:100%; text-align:left; padding:6px 10px;" @click="syncCalendar()">Shop Sync (Auto)</button>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" @click="printInvoice()" x-show="activeTicket">
+             Invoice
+          </button>
+          <button class="close-btn" @click="closePanel()">✕</button>
+        </div>
+      </div>
+
+      <div class="panel-body" x-show="activeTicket && panelMode === 'view'">
+        <!-- Status quick-change -->
+        <div style="margin-bottom:16px">
+          <div class="tdim" style="color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Update Status</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <template x-for="s in STATUSES" :key="s">
+              <button class="btn btn-ghost btn-sm"
+                :style="activeTicket && activeTicket.status === s ? 'border-color:var(--blue);color:var(--blue)' : ''"
+                @click="quickStatus(s)" x-text="s"></button>
+            </template>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Info grid -->
+        <div class="info-grid" style="margin-bottom:16px">
+          <div class="info-item">
+            <div class="lbl">Customer</div>
+            <div class="val" x-text="activeTicket && activeTicket.name"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Phone</div>
+            <div class="val mono" x-text="activeTicket && activeTicket.phone"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Email</div>
+            <div class="val" x-text="(activeTicket && activeTicket.email) || '—'"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Address</div>
+            <div class="val" x-text="(activeTicket && activeTicket.address) || '—'"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Repair Item</div>
+            <div class="val" x-text="activeTicket && activeTicket.device"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Serial</div>
+            <div class="val mono" x-text="(activeTicket && activeTicket.serial) || '—'"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Repair Type</div>
+            <div class="val" x-text="activeTicket && activeTicket.repair"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Price</div>
+            <div class="val mono" style="color:var(--green)" x-text="(activeTicket && activeTicket.price) || '—'"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Priority</div>
+            <div class="val" :class="activeTicket ? priorityClass(activeTicket.priority) : ''" x-text="activeTicket && activeTicket.priority"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Technician</div>
+            <div class="val" x-text="(activeTicket && activeTicket.technician) || '—'"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Created</div>
+            <div class="val mono tdim" x-text="activeTicket && activeTicket.created"></div>
+          </div>
+          <div class="info-item">
+            <div class="lbl">Due Date</div>
+            <div class="val mono tdim" x-text="(activeTicket && activeTicket.due) || '—'"></div>
+          </div>
+        </div>
+
+        <!-- Checklist -->
+        <div style="margin-bottom:16px" x-show="activeTicket && activeTicket.pre_repair_json && activeTicket.pre_repair_json !== '{}'">
+          <div class="tdim" style="color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pre-Repair Checklist</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <template x-for="(val, key) in getChecklist(activeTicket && activeTicket.pre_repair_json)" :key="key">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge" style="padding:1px 4px; font-size:9px"
+                  :class="val === true ? 'badge-completed' : (val === false ? 'badge-cancelled' : '')"
+                  x-text="val === true ? 'PASS' : (val === false ? 'FAIL' : 'N/A')"></span>
+                <span style="font-size:12px; color:var(--textdim)" x-text="key"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Issue -->
+        <div style="margin-bottom:16px" x-show="activeTicket && activeTicket.issue">
+          <div class="tdim" style="color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Issue Description</div>
+          <div style="font-size:13px;color:var(--textdim);line-height:1.6;white-space:pre-wrap" x-text="activeTicket && activeTicket.issue"></div>
+        </div>
+
+        <!-- Notes -->
+        <div style="margin-bottom:16px" x-show="activeTicket && activeTicket.notes">
+          <div class="tdim" style="color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Internal Notes</div>
+          <div style="font-size:13px;color:var(--textdim);line-height:1.6;white-space:pre-wrap" x-text="activeTicket && activeTicket.notes"></div>
+        </div>
+
+        <!-- Authorizations -->
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px" x-show="TICKET_MODULES.find(m=>m.id==='legal')?.enabled!==false">
+          <template x-for="(val, key) in getLegal(activeTicket && activeTicket.legal_json)" :key="key">
+            <div style="font-size:12px;color:var(--subtle)">
+              <span x-text="val ? '' : ''"
+                :style="val ? 'color:var(--green)' : 'color:var(--muted)'"></span>
+              <span x-text="key"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Photos -->
+        <div style="margin-bottom:16px" x-show="ticketPhotos && ticketPhotos.length > 0">
+          <div class="tdim" style="color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Photos</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <template x-for="photo in ticketPhotos" :key="photo.id">
+              <div style="position:relative; width:80px; height:80px; border-radius:8px; overflow:hidden; border:1px solid var(--border)">
+                <img :src="activeTicket ? '/ticket-photos/' + activeTicket.id + '/' + photo.filename : ''" style="width:100%;height:100%;object-fit:cover;cursor:pointer" @click="window.open(activeTicket ? '/ticket-photos/' + activeTicket.id + '/' + photo.filename : '', '_blank')">
+                <button @click="deletePhoto(photo.filename)" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" @click="panelMode='edit'; prefillEdit()">Edit Ticket</button>
+          <button class="btn btn-ghost btn-sm" @click="panelMode='log'">Repair Log</button>
+          <div class="dropdown" x-data="{ open: false }" @click.away="open = false" style="position:relative">
+            <button class="btn btn-ghost btn-sm" @click="open = !open">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4" stroke="var(--accent)"/>
+              </svg>
+              Photos ▾
+            </button>
+            <div class="dropdown-menu" x-show="open" x-cloak style="position:absolute; left:0; bottom:100%; margin-bottom:4px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:4px; z-index:20; width:180px;">
+              <label class="btn-ghost tdim" style="width:100%; text-align:left; padding:6px 10px; display:block; cursor:pointer">
+                Upload from Computer
+                <input type="file" multiple accept="image/*" style="display:none" @change="uploadFromDesktop($event.target.files); open=false">
+              </label>
+              <button class="btn-ghost tdim" style="width:100%; text-align:left; padding:6px 10px;" @click="open=false; startQrSession()">Take Photo (Phone)</button>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" @click="deleteTicket()">Delete</button>
+        </div>
+
+        <!-- QR Modal -->
+        <div class="panel-overlay" x-show="qrModalOpen" style="background:rgba(0,0,0,0.8);z-index:100;display:flex;align-items:center;justify-content:center;position:absolute;inset:0" x-cloak>
+          <div class="card" style="background:var(--surface);padding:24px;border-radius:8px;text-align:center;width:300px;border:1px solid var(--border)">
+            <h3 style="margin-top:0;font-size:16px">Scan to Upload</h3>
+            <p style="font-size:12px;color:var(--textdim);margin-bottom:16px">Scan this QR code with your phone camera to upload photos to this ticket.</p>
+            <div style="background:white;padding:12px;border-radius:8px;display:inline-block;margin-bottom:16px" x-show="qrSession && qrSession.qr">
+              <img :src="qrSession ? qrSession.qr : ''" style="width:200px;height:200px;display:block">
+            </div>
+            <div x-show="!qrSession || !qrSession.received" style="font-size:12px;color:var(--blue);margin-bottom:16px">
+              Waiting for photo…
+            </div>
+            <div x-show="qrSession && qrSession.received" style="font-size:12px;color:var(--green);margin-bottom:16px;font-weight:bold">
+              Photo received!
+            </div>
+            <button class="btn btn-primary" style="width:100%" @click="closeQrModal()">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Edit mode ── -->
+      <div class="panel-body" x-show="activeTicket && panelMode === 'edit'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <span style="font-size:13px;font-weight:600">Edit Ticket</span>
+          <button class="btn btn-ghost btn-sm" @click="panelMode='view'">← Back</button>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='customer')?.enabled!==false">
+          <div class="form-section-title">Customer</div>
+          <div class="form-grid form-grid-2">
+            <div class="field"><label>Name</label><input x-model="editForm.name" type="text" /></div>
+            <div class="field"><label>Phone</label><input x-model="editForm.phone" type="tel" /></div>
+            <div class="field"><label>Email</label><input x-model="editForm.email" type="email" /></div>
+            <div class="field"><label>Address</label><input x-model="editForm.address" type="text" /></div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='repair')?.enabled!==false">
+          <div class="form-section-title">Repair Item</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Repair Item</label>
+              <select x-model="editForm.device">
+                <template x-for="d in DEVICES" :key="d"><option x-text="d"></option></template>
+              </select>
+            </div>
+            <div class="field"><label>Serial Number</label><input x-model="editForm.serial" type="text" /></div>
+            <div class="field" style="grid-column:span 2">
+              <label>Repair Type</label>
+              <select x-model="editForm.repair">
+                <template x-for="r in REPAIRS" :key="r"><option x-text="r"></option></template>
+              </select>
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Issue Description</label>
+              <textarea x-model="editForm.issue" rows="3"></textarea>
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Internal Notes</label>
+              <textarea x-model="editForm.notes" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='ticket_details')?.enabled!==false">
+          <div class="form-section-title">Ticket Details</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Priority</label>
+              <div class="priority-picker">
+                <button type="button" class="prio-btn prio-standard"
+                  :class="editForm.priority==='Standard' && 'sel'" @click="editForm.priority='Standard'">Standard</button>
+                <button type="button" class="prio-btn prio-rush"
+                  :class="editForm.priority==='Rush' && 'sel'" @click="editForm.priority='Rush'">Rush</button>
+                <button type="button" class="prio-btn prio-critical"
+                  :class="editForm.priority==='Critical' && 'sel'" @click="editForm.priority='Critical'">Critical</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Price</label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="editForm.price" type="text" placeholder="0.00" />
+              </div>
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Discounts &amp; Tax</label>
+              <div style="display:flex; gap:16px; margin-top:4px">
+                <label class="check-row">
+                  <input type="checkbox" x-model="editForm.tax_exempt" />
+                  <span style="font-size:12px">Tax Exempt</span>
+                </label>
+                <select x-model="editForm.discount_type" style="font-size:12px; padding:4px 8px">
+                  <option value="None">No Discount</option>
+                  <option value="Veteran / First Responder (10%)">Veteran (10%)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Technician</label>
+              <select x-model="editForm.technician">
+                <option value="">Unassigned</option>
+                <template x-for="t in TICKET_TECHS" :key="t"><option x-text="t"></option></template>
+              </select>
+            </div>
+            <div class="field"><label>Due Date</label><input x-model="editForm.due" type="text" /></div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='checklist')?.enabled!==false">
+          <div class="form-section-title">Pre-Repair Checklist</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <template x-for="(val, key) in getChecklist(editForm.pre_repair_json)" :key="key">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0;">
+                <span style="font-size:12px; color:var(--textdim)" x-text="key"></span>
+                <div style="display:flex; gap:4px">
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px; font-size:10px"
+                    :style="val === true ? 'background:var(--green); color:white' : ''"
+                    @click="updateChecklist(editForm, key, true)">Pass</button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px; font-size:10px"
+                    :style="val === false ? 'background:var(--red); color:white' : ''"
+                    @click="updateChecklist(editForm, key, false)">Fail</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='legal')?.enabled!==false">
+          <div class="form-section-title">Authorizations &amp; Legal</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <template x-for="(val, key) in getLegal(editForm.legal_json)" :key="key">
+              <label class="check-row">
+                <input type="checkbox" :checked="val" @change="updateLegal(editForm, key, $event.target.checked)" />
+                <span x-text="key"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" @click="saveEdit()">Save Changes</button>
+          <button class="btn btn-ghost" @click="panelMode='view'">Cancel</button>
+        </div>
+      </div>
+
+      <!-- ── Repair log mode ── -->
+      <div class="panel-body" x-show="activeTicket && panelMode === 'log'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <span style="font-size:13px;font-weight:600">Repair Log</span>
+          <button class="btn btn-ghost btn-sm" @click="panelMode='view'">← Back</button>
+        </div>
+
+        <!-- Add log entry -->
+        <div class="form-section" style="margin-bottom:16px">
+          <div class="form-section-title">Add Entry</div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Status</label>
+            <select x-model="logEntry.status">
+              <option value="Resolution">Resolution</option>
+              <template x-for="s in STATUSES" :key="s"><option x-text="s"></option></template>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Note</label>
+            <textarea x-model="logEntry.note" rows="3" placeholder="What was done or found..."></textarea>
+          </div>
+          <button class="btn btn-primary btn-sm" @click="addLog()">Add to Log</button>
+        </div>
+
+        <!-- Log entries -->
+        <div x-show="repairLog.length === 0" class="empty-state" style="padding:20px 0">
+          <p>No log entries yet.</p>
+        </div>
+        <template x-for="entry in repairLog" :key="entry.id">
+          <div class="log-entry">
+            <div style="display:flex;gap:10px;align-items:center">
+              <span class="badge" :class="badgeClass(entry.status)" x-text="entry.status"></span>
+              <span class="log-ts" x-text="entry.timestamp"></span>
+            </div>
+            <div class="log-note tdim" x-text="entry.note"></div>
+          </div>
+        </template>
+      </div>
+
+    </div><!-- /panel -->
+  </div>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+       NEW TICKET PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'new'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content drawer">
+      <div class="panel-head">
+        <span class="panel-title">New Repair Ticket</span>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+      <div class="panel-body">
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='customer')?.enabled!==false">
+          <div class="form-section-title">Customer</div>
+          
+          <!-- Search Existing Customer -->
+          <div class="field" style="margin-bottom:16px;">
+            <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--textdim)">Search Existing Customer</label>
+            <div style="position:relative" @click.away="customerSuggestions = []">
+              <input x-model="customerQuery" 
+                     @input.debounce.200ms="searchCustomerSuggestions()" 
+                     @keydown.arrow-down.prevent="if (customerSuggestions.length > 0) selectedSuggestionIndex = (selectedSuggestionIndex + 1) % customerSuggestions.length"
+                     @keydown.arrow-up.prevent="if (customerSuggestions.length > 0) selectedSuggestionIndex = (selectedSuggestionIndex - 1 + customerSuggestions.length) % customerSuggestions.length"
+                     @keydown.enter.prevent="if (selectedSuggestionIndex >= 0 && customerSuggestions[selectedSuggestionIndex]) selectCustomerSuggestion(customerSuggestions[selectedSuggestionIndex])"
+                     @keydown.escape="customerSuggestions = []"
+                     type="text" placeholder="Type name, phone, or email..." style="width:100%" />
+              <div style="position:absolute; right:10px; top:50%; transform:translateY(-50%); display:flex; gap:6px; align-items:center; pointer-events:none">
+                <span style="font-size:12px; color:var(--textdim)" x-show="customerSuggestions.length > 0" x-text="`${customerSuggestions.length} found`"></span>
+                <span style="display:inline-flex; color:var(--textdim)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="var(--accent)"/>
+                  </svg>
+                </span>
+              </div>
+              
+              <!-- Suggestions Dropdown -->
+              <div x-show="customerSuggestions.length > 0" 
+                   x-transition
+                   style="position:absolute; left:0; right:0; top:100%; margin-top:4px; background:var(--surface2); border:1px solid var(--border2); border-radius:8px; box-shadow:var(--shadow-lg); z-index:999; max-height:200px; overflow-y:auto; padding:4px;">
+                <template x-for="(cust, idx) in customerSuggestions" :key="cust.id">
+                  <div @click="selectCustomerSuggestion(cust)"
+                       @mouseenter="selectedSuggestionIndex = idx"
+                       style="padding:8px 12px; border-radius:6px; cursor:pointer; display:flex; flex-direction:column; gap:2px; font-size:13px; transition:all 0.2s;"
+                       :style="selectedSuggestionIndex === idx ? 'background:var(--surface); border:1px solid var(--border)' : 'border:1px solid transparent'">
+                    <div style="font-weight:600; color:var(--text)" x-text="cust.name"></div>
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--textdim)">
+                      <span x-text="cust.phone"></span>
+                      <span x-text="cust.email || 'No email'"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Full Name <span style="color:var(--red)">*</span></label>
+              <input x-model="form.name" type="text" placeholder="Jane Smith" required />
+            </div>
+            <div class="field">
+              <label>Phone <span style="color:var(--red)">*</span></label>
+              <input x-model="form.phone" type="tel" placeholder="(580) 000-0000" required />
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input x-model="form.email" type="email" placeholder="jane@email.com" />
+            </div>
+            <div class="field">
+              <label>Address</label>
+              <input x-model="form.address" type="text" placeholder="123 Main St" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='device')?.enabled!==false">
+          <div class="form-section-title">Repair Item</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Repair Item <span style="color:var(--red)">*</span></label>
+              <select x-model="form.device" required>
+                <option value="">Select…</option>
+                <template x-for="d in DEVICES" :key="d"><option x-text="d"></option></template>
+              </select>
+            </div>
+            <div class="field">
+              <label>Serial Number</label>
+              <input x-model="form.serial" type="text" placeholder="Optional" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='repair')?.enabled!==false">
+          <div class="form-section-title">Repair</div>
+          <div class="form-grid form-grid-2">
+            <div class="field" style="grid-column:span 2">
+              <label>Repair Type <span style="color:var(--red)">*</span></label>
+              <select x-model="form.repair" @change="onRepairChange()" required>
+                <option value="">Select…</option>
+                <template x-for="r in REPAIRS" :key="r"><option x-text="r"></option></template>
+              </select>
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Issue Description</label>
+              <textarea x-model="form.issue" rows="3" placeholder="Describe the problem…"></textarea>
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Internal Notes</label>
+              <textarea x-model="form.notes" rows="2" placeholder="Not printed on invoice…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='ticket_details')?.enabled!==false">
+          <div class="form-section-title">Ticket Details</div>
+          <div class="form-grid form-grid-2">
+            <div class="field" style="grid-column:span 2">
+              <label>Priority</label>
+              <div class="priority-picker">
+                <button type="button" class="prio-btn prio-standard"
+                  :class="form.priority==='Standard' && 'sel'" @click="form.priority='Standard'">Standard</button>
+                <button type="button" class="prio-btn prio-rush"
+                  :class="form.priority==='Rush' && 'sel'" @click="form.priority='Rush'">Rush</button>
+                <button type="button" class="prio-btn prio-critical"
+                  :class="form.priority==='Critical' && 'sel'" @click="form.priority='Critical'">Critical</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Price</label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="form.price" type="text" placeholder="0.00" />
+              </div>
+              <span class="field-hint" x-show="repairHint" x-text="repairHint"></span>
+            </div>
+            <div class="field" style="grid-column:span 2">
+              <label>Discounts &amp; Tax</label>
+              <div style="display:flex; gap:16px; margin-top:4px">
+                <label class="check-row">
+                  <input type="checkbox" x-model="form.tax_exempt" />
+                  <span style="font-size:12px">Tax Exempt</span>
+                </label>
+                <select x-model="form.discount_type" style="font-size:12px; padding:4px 8px">
+                  <option value="None">No Discount</option>
+                  <option value="Veteran / First Responder (10%)">Veteran (10%)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Technician</label>
+              <select x-model="form.technician">
+                <option value="">Unassigned</option>
+                <template x-for="t in TICKET_TECHS" :key="t"><option x-text="t"></option></template>
+              </select>
+            </div>
+            <div class="field">
+              <label>Due Date <span style="color:var(--muted);font-size:10px">(auto)</span></label>
+              <input x-model="form.due" type="text" placeholder="Auto from repair type" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='checklist')?.enabled!==false">
+          <div class="form-section-title">Pre-Repair Checklist</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <template x-for="(val, key) in getChecklist(form.pre_repair_json)" :key="key">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0;">
+                <span style="font-size:12px; color:var(--textdim)" x-text="key"></span>
+                <div style="display:flex; gap:4px">
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px; font-size:10px"
+                    :style="val === true ? 'background:var(--green); color:white' : ''"
+                    @click="updateChecklist(form, key, true)">Pass</button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px; font-size:10px"
+                    :style="val === false ? 'background:var(--red); color:white' : ''"
+                    @click="updateChecklist(form, key, false)">Fail</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="form-section" x-show="TICKET_MODULES.find(m=>m.id==='legal')?.enabled!==false">
+          <div class="form-section-title">Authorizations &amp; Legal</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <template x-for="(val, key) in getLegal(form.legal_json)" :key="key">
+              <label class="check-row">
+                <input type="checkbox" :checked="val" @change="updateLegal(form, key, $event.target.checked)" />
+                <span x-text="key"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary"
+            :disabled="submitting"
+            :style="submitting ? 'opacity:.5;cursor:not-allowed' : ''"
+            @click="submitTicket()">
+            <span x-show="!submitting">Create Ticket</span>
+            <span x-show="submitting">Creating…</span>
+          </button>
+          <button class="btn btn-ghost" @click="closePanel()">Cancel</button>
+        </div>
+
+      </div><!-- /panel-body -->
+    </div><!-- /panel -->
+  </div>
+<!-- ════════════════════════════════════════════════════════════════════════
+       REPAIR SETTINGS PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'repair_settings'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content drawer" style="max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;">
+      <div class="panel-head" style="flex-shrink: 0">
+        <span class="panel-title">Repair Settings</span>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+      <div class="panel-body" style="flex: 1; overflow-y: auto;">
+        
+
+        <!-- Modules Toggle -->
+        <div class="form-section">
+          <div class="form-section-title">Active Modules</div>
+          <p style="font-size:12px;color:var(--textdim);margin-bottom:8px">Toggle which sections appear on the repair ticket forms.</p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <template x-for="mod in TICKET_MODULES" :key="mod.id">
+              <label class="check-row" style="background:var(--surface2);padding:8px;border-radius:8px;border:1px solid var(--border)">
+                <input type="checkbox" x-model="mod.enabled" @change="saveRepairSettings()" />
+                <span style="font-weight:600" x-text="mod.name"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Repair Types -->
+        <div class="form-section">
+          <div class="form-section-title">Repair Types</div>
+          <table class="data-table" style="margin-bottom:8px">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Price ($)</th>
+                <th>Days (ETA)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(r, index) in REPAIRS" :key="index">
+                <tr>
+                  <td><div class="field" style="margin-bottom:0"><input type="text" x-model="REPAIRS[index]" @change="REPAIRS[index]=r; saveRepairSettings()" style="width:100%" placeholder="Repair name..."/></div></td>
+                  <td><div class="field" style="margin-bottom:0"><input type="number" x-model="REPAIR_PRICE[r]" @change="saveRepairSettings()" style="width:100%" placeholder="0.00"/></div></td>
+                  <td><div class="field" style="margin-bottom:0"><input type="number" x-model="REPAIR_DAYS[r]" @change="saveRepairSettings()" style="width:100%" placeholder="1"/></div></td>
+                  <td style="text-align:right"><button class="btn btn-ghost btn-sm" @click="removeRepairType(r)" style="color:var(--red)">Remove</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <button class="btn btn-ghost btn-sm" @click="addRepairType()">+ Add Repair Type</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Repair Items & Technicians -->
+        <div class="form-grid form-grid-2">
+          <div class="form-section">
+            <div class="form-section-title">Repair Items</div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+              <template x-for="(d, index) in DEVICES" :key="index">
+                <div style="display:flex;gap:4px">
+                  <div class="field" style="flex:1; margin-bottom:0">
+                    <input type="text" x-model="DEVICES[index]" @change="saveRepairSettings()" placeholder="Item name..." style="width:100%" />
+                  </div>
+                  <button class="btn btn-ghost" @click="DEVICES.splice(index, 1); saveRepairSettings()" style="color:var(--red)">✕</button>
+                </div>
+              </template>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="DEVICES.push(''); saveRepairSettings()">+ Add Repair Item</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">Technicians</div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+              <template x-for="(t, index) in TICKET_TECHS" :key="index">
+                <div style="display:flex;gap:4px">
+                  <div class="field" style="flex:1; margin-bottom:0">
+                    <input type="text" x-model="TICKET_TECHS[index]" @change="saveRepairSettings()" placeholder="Tech name..." style="width:100%" />
+                  </div>
+                  <button class="btn btn-ghost" @click="TICKET_TECHS.splice(index, 1); saveRepairSettings()" style="color:var(--red)">✕</button>
+                </div>
+              </template>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="TICKET_TECHS.push(''); saveRepairSettings()">+ Add Technician</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Checklist & Legal -->
+        <div class="form-grid form-grid-2">
+          <div class="form-section">
+            <div class="form-section-title">Checklist Items</div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+              <template x-for="(c, index) in TICKET_CHECKLIST" :key="index">
+                <div style="display:flex;gap:4px">
+                  <div class="field" style="flex:1; margin-bottom:0">
+                    <input type="text" x-model="TICKET_CHECKLIST[index]" @change="saveRepairSettings()" placeholder="Checklist item..." style="width:100%" />
+                  </div>
+                  <button class="btn btn-ghost" @click="TICKET_CHECKLIST.splice(index, 1); saveRepairSettings()" style="color:var(--red)">✕</button>
+                </div>
+              </template>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="TICKET_CHECKLIST.push(''); saveRepairSettings()">+ Add Checklist Item</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">Legal &amp; Authorizations</div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+              <template x-for="(l, index) in TICKET_LEGAL" :key="index">
+                <div style="display:flex;gap:4px">
+                  <div class="field" style="flex:1; margin-bottom:0">
+                    <input type="text" x-model="TICKET_LEGAL[index]" @change="saveRepairSettings()" placeholder="Legal waiver text..." style="width:100%" />
+                  </div>
+                  <button class="btn btn-ghost" @click="TICKET_LEGAL.splice(index, 1); saveRepairSettings()" style="color:var(--red)">✕</button>
+                </div>
+              </template>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="TICKET_LEGAL.push(''); saveRepairSettings()">+ Add Legal Check</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="flex-shrink: 0; padding: 16px 20px; border-top: 1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; background: var(--surface); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+        <button class="btn btn-ghost" @click="closePanel()">Close</button>
+        <button class="btn btn-primary" @click="saveRepairSettings(); closePanel()">Save &amp; Close</button>
+      </div>
+
+    </div>
+  </div>

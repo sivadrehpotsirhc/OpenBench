@@ -1,0 +1,331 @@
+<!-- ════════════════════════════════════════════════════════════════════
+         SOFTWARE REPOSITORY ADMIN INTERFACE
+     ═════════════════════════════════════════════════════════════════════ -->
+<div class="plugin-view" x-data="softwareRepoPlugin()" x-init="init()">
+  
+  <!-- Header -->
+  <div class="section-head mb-6">
+    <span class="section-title">Software Repository</span>
+    <div class="flex gap-2">
+      <!-- Context-Aware Action Button -->
+      <template x-if="activeTab === 'tools'">
+        <button class="btn btn-primary" @click="openAddTool()">
+          <span>Upload Tool</span>
+        </button>
+      </template>
+      <template x-if="activeTab === 'sessions'">
+        <div class="flex items-center gap-2">
+          <input type="number" x-model="ttlMinutes" min="5" max="1440" class="bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] px-3 py-1.5 rounded-lg text-sm w-20 outline-none focus:border-[var(--accent)]" />
+          <span class="text-xs text-[var(--textdim)]">min</span>
+          <button class="btn btn-primary ml-1" @click="generatePin()" :disabled="isGenerating">
+            <template x-if="isGenerating">
+              <span class="inline-block w-3 h-3 border-2 border-current rounded-full border-t-transparent animate-spin mr-1"></span>
+            </template>
+            <span>Generate PIN</span>
+          </button>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="flex border-b border-[var(--border)] mb-6 gap-2">
+    <button class="tab py-2 px-4 border-b-2 font-medium text-sm transition-all"
+            :class="activeTab === 'tools' ? 'text-[var(--text)] border-[var(--accent)] bg-[var(--surface)]' : 'text-[var(--textdim)] border-transparent hover:text-[var(--text)]'"
+            @click="activeTab = 'tools'">
+      Tool Library
+      <span class="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--surface2)] text-[var(--textdim)]" x-text="tools.length"></span>
+    </button>
+    <button class="tab py-2 px-4 border-b-2 font-medium text-sm transition-all"
+            :class="activeTab === 'sessions' ? 'text-[var(--text)] border-[var(--accent)] bg-[var(--surface)]' : 'text-[var(--textdim)] border-transparent hover:text-[var(--text)]'"
+            @click="activeTab = 'sessions'">
+      Active Guest Sessions
+      <span class="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--surface2)] text-[var(--textdim)]" x-text="sessions.length"></span>
+    </button>
+    <button class="tab py-2 px-4 border-b-2 font-medium text-sm transition-all"
+            :class="activeTab === 'downloads' ? 'text-[var(--text)] border-[var(--accent)] bg-[var(--surface)]' : 'text-[var(--textdim)] border-transparent hover:text-[var(--text)]'"
+            @click="activeTab = 'downloads'">
+      Download Logs
+      <span class="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--surface2)] text-[var(--textdim)]" x-text="downloads.length"></span>
+    </button>
+  </div>
+
+  <!-- Content Areas -->
+  
+  <!-- TAB 1: TOOL LIBRARY -->
+  <div x-show="activeTab === 'tools'" class="space-y-4">
+    <div class="toolbar">
+      <input class="search-box w-full" 
+             x-model="search" 
+             type="text" 
+             placeholder="Search tools by name, description, or category..." />
+    </div>
+
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 20%">Category</th>
+            <th style="width: 25%">Tool Name & Version</th>
+            <th style="width: 35%">Description</th>
+            <th style="width: 10%">Size</th>
+            <th style="width: 10%; text-align: center;">Status</th>
+            <th style="width: 10%">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-if="filteredTools().length === 0">
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <p class="text-base font-semibold">No tools found</p>
+                  <p class="text-xs mt-1">Upload a tool binary or portable file to get started.</p>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <template x-for="t in filteredTools()" :key="t.id">
+            <tr class="hover:bg-[var(--surface)] transition duration-150">
+              <td class="align-middle">
+                <div class="flex items-center gap-2 text-sm">
+                  <span x-text="t.category_name" class="font-medium"></span>
+                </div>
+              </td>
+              <td class="align-middle">
+                <div class="flex flex-col">
+                  <span x-text="t.name" class="font-semibold text-[var(--text)]"></span>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="text-[10px] text-[var(--textdim)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-md font-mono" x-text="'v' + (t.version || '1.0')"></span>
+                    <template x-if="t.is_portable">
+                      <span class="text-[9px] text-[var(--accent-hot)] bg-[var(--ember-glow)] border border-[var(--accent-deep)] px-1.5 py-0.5 rounded-md lowercase tracking-wider font-mono font-medium">portable</span>
+                    </template>
+                  </div>
+                </div>
+              </td>
+              <td class="align-middle text-sm text-[var(--textdim)] max-w-xs truncate" x-text="t.description || '—'"></td>
+              <td class="align-middle font-mono text-xs" x-text="formatSize(t.file_size_kb)"></td>
+              <td class="align-middle text-center">
+                <button @click="toggleTool(t)" 
+                        class="px-3 py-1 rounded-lg text-xs font-semibold border transition-all duration-150"
+                        :class="t.is_active ? 'bg-[rgba(34,197,94,0.12)] text-[var(--green)] border-[rgba(34,197,94,0.3)] hover:bg-[rgba(34,197,94,0.2)]' : 'bg-[var(--surface2)] text-[var(--textdim)] border-[var(--border)] hover:bg-[var(--surface-hover)]'">
+                  <span x-text="t.is_active ? 'Active' : 'Inactive'"></span>
+                </button>
+              </td>
+              <td class="align-middle">
+                <button class="btn btn-danger btn-sm px-2.5 py-1 text-xs" @click="deleteTool(t)">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: ACTIVE SESSIONS -->
+  <div x-show="activeTab === 'sessions'">
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 30%">Session Token</th>
+            <th style="width: 20%">Created At</th>
+            <th style="width: 20%">Expires At</th>
+            <th style="width: 20%">Last Used</th>
+            <th style="width: 10%">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-if="sessions.length === 0">
+            <tr>
+              <td colspan="5">
+                <div class="empty-state">
+                  <p class="text-base font-semibold">No active sessions</p>
+                  <p class="text-xs mt-1">Specify a TTL and click <strong>Generate PIN</strong> to authorize a customer session.</p>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <template x-for="s in sessions" :key="s.id">
+            <tr class="hover:bg-[var(--surface)] transition duration-150">
+              <td class="align-middle font-mono text-xs text-[var(--textdim)] select-all" x-text="s.id"></td>
+              <td class="align-middle text-xs text-[var(--textdim)]" x-text="formatDate(s.created_at)"></td>
+              <td class="align-middle text-xs text-[var(--textdim)]" x-text="formatDate(s.expires_at)"></td>
+              <td class="align-middle text-xs font-medium text-[var(--green)]" x-text="s.last_used ? formatDate(s.last_used) : 'Never'"></td>
+              <td class="align-middle">
+                <button class="btn btn-danger btn-sm px-2.5 py-1 text-xs" @click="revokeSession(s)">
+                  Revoke
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 3: DOWNLOAD LOGS -->
+  <div x-show="activeTab === 'downloads'">
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 25%">Time</th>
+            <th style="width: 30%">Tool Downloaded</th>
+            <th style="width: 30%">Session Token</th>
+            <th style="width: 15%">Client IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-if="downloads.length === 0">
+            <tr>
+              <td colspan="4">
+                <div class="empty-state">
+                  <p class="text-base font-semibold">No download records</p>
+                  <p class="text-xs mt-1">Downloads will log here automatically.</p>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <template x-for="d in downloads" :key="d.id">
+            <tr class="hover:bg-[var(--surface)] transition duration-150">
+              <td class="align-middle text-xs text-[var(--textdim)]" x-text="formatDate(d.downloaded_at)"></td>
+              <td class="align-middle font-semibold text-[var(--text)]" x-text="d.tool_name || ('Deleted Tool (ID: ' + d.tool_id + ')')"></td>
+              <td class="align-middle font-mono text-xs text-[var(--textdim)] truncate max-w-xs" x-text="d.session_id"></td>
+              <td class="align-middle font-mono text-xs text-[var(--textdim)]" x-text="d.client_ip"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Slide-Over Panel Details (Alpine.js State controlled) -->
+  <div class="panel-overlay" x-show="panelOpen" @click.self="closePanel()" x-cloak style="display: none;">
+    <div class="panel-content drawer">
+      
+      <!-- Panel Header -->
+      <div class="panel-head">
+        <span class="panel-title" x-text="panelMode === 'add_tool' ? 'Upload Portable Tool' : 'Session Authorized'"></span>
+        <button class="close-btn" @click="closePanel()">x</button>
+      </div>
+
+      <!-- Panel Body -->
+      <div class="panel-body">
+        
+        <!-- Add Tool Form -->
+        <template x-if="panelMode === 'add_tool'">
+          <div class="space-y-5">
+            <div class="form-section">
+              <div class="form-section-title">Binary / Archive File</div>
+              <div class="field">
+                <label>Select File <span class="text-[var(--red)]">*</span></label>
+                <input type="file" id="tool-file-input" @change="handleFileChange($event)" class="w-full bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] p-2 rounded-lg text-sm" required />
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Tool Metadata</div>
+              <div class="form-grid form-grid-2 gap-4">
+                <div class="field col-span-2">
+                  <label>Tool Name <span class="text-[var(--red)]">*</span></label>
+                  <input type="text" x-model="newTool.name" placeholder="e.g. HWMonitor, AdwCleaner" class="w-full" required />
+                </div>
+                <div class="field">
+                  <label>Category <span class="text-[var(--red)]">*</span></label>
+                  <select id="tool-category-select" x-model="newTool.category_id" class="w-full" required
+                          x-html="getCategoryOptionsHtml()">
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Version</label>
+                  <input type="text" x-model="newTool.version" placeholder="e.g. 1.8.4" class="w-full" />
+                </div>
+                <div class="field col-span-2">
+                  <label>Description</label>
+                  <textarea x-model="newTool.description" rows="3" placeholder="Symptom checks, hardware diagnostics, cleaning functions..." class="w-full"></textarea>
+                </div>
+                <div class="field col-span-2 flex items-center gap-2 mt-2">
+                  <input type="checkbox" id="is-portable-chk" x-model="newTool.is_portable" class="rounded-sm border-[var(--border)] bg-[var(--surface)] text-[var(--accent)] focus:ring-[var(--accent)]" />
+                  <label for="is-portable-chk" class="text-sm cursor-pointer select-none">Mark as portable (self-contained executable)</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex gap-3 justify-end mt-6 pt-4 border-t border-[var(--border)]">
+              <button class="btn btn-primary px-6" @click="submitToolForm()" :disabled="isUploading">
+                <template x-if="isUploading">
+                  <span class="inline-block w-3 h-3 border-2 border-current rounded-full border-t-transparent animate-spin mr-1"></span>
+                </template>
+                <span x-text="isUploading ? 'Uploading...' : 'Upload & Save'"></span>
+              </button>
+              <button class="btn btn-ghost px-6" @click="closePanel()">Cancel</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- PIN Display Panel (TECHNICIAN SEES THIS EXACTLY ONCE) -->
+        <template x-if="panelMode === 'show_pin' && generatedPin">
+          <div class="space-y-6 text-center py-4">
+            
+            <div class="w-16 h-16 bg-[rgba(34,197,94,0.12)] border border-[rgba(34,197,94,0.3)] rounded-full flex items-center justify-center text-[var(--green)] mx-auto">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6 9 17l-5-5"/>
+              </svg>
+            </div>
+
+            <div class="space-y-2">
+              <h3 class="text-lg font-bold text-[var(--text)]">Session Authorization Successful</h3>
+              <p class="text-xs text-[var(--textdim)] max-w-sm mx-auto">
+                Read this PIN to the customer, or paste the session token into their portal login page on their local machine.
+              </p>
+            </div>
+
+            <!-- PIN Display Box -->
+            <div class="bg-[var(--ember-glow)] border border-[var(--accent-deep)] rounded-lg p-6 max-w-xs mx-auto">
+              <div class="text-[10px] lowercase font-mono tracking-widest text-[var(--accent-hot)] mb-2 font-medium">// one-time guest pin</div>
+              <div class="text-4xl font-extrabold tracking-[0.2em] font-mono text-[var(--text)] select-all" x-text="generatedPin.pin.substring(0,3) + ' ' + generatedPin.pin.substring(3,6)">
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Session Details -->
+            <div class="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 text-left space-y-3 text-xs max-w-sm mx-auto">
+              <div class="flex justify-between">
+                <span class="text-[var(--textdim)]">Session Token (UUID):</span>
+                <span class="font-mono text-[var(--text)] font-semibold select-all" x-text="generatedPin.token"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--textdim)]">Portal URL:</span>
+                <span class="font-mono text-[var(--text)] select-all font-semibold" x-text="getGuestPortalUrl()">http://[your-local-ip]:8000/tools</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--textdim)]">Validity Duration:</span>
+                <span class="text-[var(--yellow)] font-semibold" x-text="generatedPin.ttl_minutes + ' minutes'"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--textdim)]">Expires At:</span>
+                <span class="font-semibold font-mono tdim" x-text="formatDate(generatedPin.expires_at)"></span>
+              </div>
+            </div>
+
+            <div class="pt-6">
+              <button class="btn btn-primary px-8" @click="closePanel()">
+                Done, Close Panel
+              </button>
+            </div>
+            
+            <p class="text-[10px] text-[var(--yellow)] font-medium">
+              Warning: Plaintext PIN will NOT be shown again. Write it down or use it now!
+            </p>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+
+</div>

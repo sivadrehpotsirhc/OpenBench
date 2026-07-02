@@ -1,0 +1,114 @@
+<!-- ════════════════════════════════════════════════════════════════════
+         TICKETS TAB
+    ═════════════════════════════════════════════════════════════════════ -->
+    <div class="plugin-view">
+      <div class="section-head">
+        <span class="section-title">Repair Tickets</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" @click="panel = 'repair_settings'">️ Settings</button>
+          <button class="btn btn-ghost" @click="exportTickets()"> Export CSV</button>
+          <button class="btn btn-primary" @click="openNewTicket()">+ New Ticket</button>
+        </div>
+      </div>
+
+      <!-- Stats bar -->
+      <div id="statsbar" class="!px-0 !pt-0" style="margin: 8px 0 24px 0;">
+        <div class="stat-cell">
+          <span class="stat-value" style="color:var(--blue)" x-text="stats.open ?? '—'"></span>
+          <span class="stat-label">Open</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-value" style="color:var(--yellow)" x-text="stats.due_today ?? '—'"></span>
+          <span class="stat-label">Due Today</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-value" style="color:var(--red)" x-text="stats.overdue ?? '—'"></span>
+          <span class="stat-label">Overdue</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-value" style="color:var(--green)" x-text="stats.revenue ?? '—'"></span>
+          <span class="stat-label">Revenue (Week)</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input class="search-box" x-model="ticketSearch"
+          @input.debounce.300ms="fetchTickets()"
+          type="text" placeholder="Search name, item, issue, ticket ID…" />
+        <select class="filter-select" x-model="ticketStatus" @change="fetchTickets()">
+          <option value="">All Statuses</option>
+          <option>Open</option>
+          <option>In Progress</option>
+          <option>Waiting on Parts</option>
+          <option>Ready for Pickup</option>
+          <option>Completed</option>
+          <option>Cancelled</option>
+        </select>
+        <select class="filter-select" x-model="ticketPriority" @change="fetchTickets()">
+          <option value="">All Priorities</option>
+          <option>Standard</option>
+          <option>Rush</option>
+          <option>Critical</option>
+        </select>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="sortable" @click="toggleTicketSort('id')" :aria-sort="ticketSortBy === 'id' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Ticket <span x-show="ticketSortBy === 'id'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('name')" :aria-sort="ticketSortBy === 'name' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Customer <span x-show="ticketSortBy === 'name'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('device')" :aria-sort="ticketSortBy === 'device' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Item <span x-show="ticketSortBy === 'device'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('repair')" :aria-sort="ticketSortBy === 'repair' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Repair Type <span x-show="ticketSortBy === 'repair'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('status')" :aria-sort="ticketSortBy === 'status' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Status <span x-show="ticketSortBy === 'status'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('priority')" :aria-sort="ticketSortBy === 'priority' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Priority <span x-show="ticketSortBy === 'priority'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('due')" :aria-sort="ticketSortBy === 'due' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Due <span x-show="ticketSortBy === 'due'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleTicketSort('price')" :aria-sort="ticketSortBy === 'price' ? (ticketSortDesc ? 'descending' : 'ascending') : 'none'">
+                Price <span x-show="ticketSortBy === 'price'" x-text="ticketSortDesc ? '▼' : '▲'"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="tickets.length === 0">
+              <tr>
+                <td colspan="8">
+                  <div class="empty-state">
+                    <div class="empty-icon"></div>
+                    <p>No tickets found. Create one to get started.</p>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <template x-for="t in tickets" :key="t.id">
+              <tr :class="railClass(t.status)" @click="openTicket(t)">
+                <td><span class="tid mono" x-text="t.id"></span></td>
+                <td>
+                  <div class="tname" x-text="t.name"></div>
+                  <div class="tdim" x-text="t.phone"></div>
+                </td>
+                <td class="tdim" x-text="t.device ?? '—'"></td>
+                <td class="tdim" x-text="t.repair ?? '—'"></td>
+                <td><span class="badge" :class="badgeClass(t.status)" x-text="t.status"></span></td>
+                <td><span :class="priorityClass(t.priority)" x-text="t.priority"></span></td>
+                <td class="tdim mono" x-text="t.due ?? '—'"></td>
+                <td class="price-cell" x-text="t.price || '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>

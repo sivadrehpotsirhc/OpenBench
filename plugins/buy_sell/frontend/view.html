@@ -1,0 +1,111 @@
+<!-- ════════════════════════════════════════════════════════════════════
+         BUY / SELL TAB
+    ═════════════════════════════════════════════════════════════════════ -->
+    <style>
+      .badge-bought {
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--blue);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .badge-sold {
+        background: rgba(34, 197, 94, 0.15);
+        color: var(--green);
+        border: 1px solid rgba(34, 197, 94, 0.2);
+      }
+    </style>
+    <div class="plugin-view">
+      <div class="section-head">
+        <span class="section-title">Buy & Sell Products</span>
+        <button class="btn btn-primary" @click="openNewDevice()">+ Add Product</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--textdim)" x-text="bsStats.staging ?? '—'"></div>
+          <div class="stat-label">Staging</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--blue)" x-text="bsStats.ready ?? '—'"></div>
+          <div class="stat-label">Ready for Sale</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--green)" x-text="bsStats.sold ?? '—'"></div>
+          <div class="stat-label">Sold</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--green)" x-text="bsStats.profit ?? '—'"></div>
+          <div class="stat-label">Profit</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input class="search-box" x-model="bsSearch"
+          @input.debounce.300ms="fetchDevices()"
+          type="text" placeholder="Search devices, customers…" />
+        <select class="filter-select" x-model="bsStatus" @change="fetchDevices()">
+          <option value="">All Statuses</option>
+          <option>Staging</option>
+          <option>Ready for Sale</option>
+          <option>Sold</option>
+        </select>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="sortable" @click="toggleBSDeviceSort('device')" :aria-sort="bsDeviceSortBy === 'device' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Device <span x-show="bsDeviceSortBy === 'device'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleBSDeviceSort('customer')" :aria-sort="bsDeviceSortBy === 'customer' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Customer <span x-show="bsDeviceSortBy === 'customer'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleBSDeviceSort('condition')" :aria-sort="bsDeviceSortBy === 'condition' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Condition <span x-show="bsDeviceSortBy === 'condition'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleBSDeviceSort('status')" :aria-sort="bsDeviceSortBy === 'status' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Status <span x-show="bsDeviceSortBy === 'status'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleBSDeviceSort('purchase_price')" :aria-sort="bsDeviceSortBy === 'purchase_price' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Purchase Price <span x-show="bsDeviceSortBy === 'purchase_price'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleBSDeviceSort('sell_price')" :aria-sort="bsDeviceSortBy === 'sell_price' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Sell Price <span x-show="bsDeviceSortBy === 'sell_price'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleBSDeviceSort('date_sold')" :aria-sort="bsDeviceSortBy === 'date_sold' ? (bsDeviceSortDesc ? 'descending' : 'ascending') : 'none'">
+                Sold Date <span x-show="bsDeviceSortBy === 'date_sold'" x-text="bsDeviceSortDesc ? '▼' : '▲'"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="bsDevices.length === 0">
+              <tr>
+                <td colspan="7">
+                  <div class="empty-state">
+                    <div class="empty-icon"></div>
+                    <p>No products found.</p>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <template x-for="d in bsDevices" :key="d.id">
+              <tr @click="openDevice(d)">
+                <td class="tname" x-text="d.device"></td>
+                <td>
+                  <div class="tdim" x-text="d.customer_name || '—'"></div>
+                  <div class="tdim" x-text="d.customer_phone"></div>
+                </td>
+                <td class="tdim" x-text="d.condition"></td>
+                <td>
+                  <span class="badge"
+                    :class="{'badge-bought': d.status==='Staging', 'badge-pickup': d.status==='Ready for Sale', 'badge-sold': d.status==='Sold'}"
+                    x-text="d.status"></span>
+                </td>
+                <td class="tdim mono" x-text="d.purchase_price ? '$' + parseFloat(d.purchase_price).toFixed(2) : '—'"></td>
+                <td class="price-cell" x-text="d.sell_price ? '$' + parseFloat(d.sell_price).toFixed(2) : '—'"></td>
+                <td class="tdim mono" x-text="d.date_sold || '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>

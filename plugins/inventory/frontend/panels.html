@@ -1,0 +1,99 @@
+<!-- ════════════════════════════════════════════════════════════════════════
+       PART DETAIL / EDIT PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'part'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content drawer">
+      <div class="panel-head">
+        <span class="panel-title" x-text="panelMode === 'new' ? 'Add New Part' : 'Edit Part'"></span>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+      <div class="panel-body">
+
+        <div class="form-section">
+          <div class="form-section-title">Part Information</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Part Name <span style="color:var(--red)">*</span></label>
+              <input x-model="partForm.name" type="text" placeholder="e.g. 500GB Samsung 870 EVO" required />
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="field">
+                <label>SKU / Model</label>
+                <input x-model="partForm.sku" type="text" placeholder="Optional" />
+              </div>
+              <div class="field">
+                <label>Category</label>
+                <select x-model="partForm.category">
+                  <template x-for="c in CATEGORIES" :key="c"><option x-text="c"></option></template>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Stock &amp; Pricing</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Quantity in Stock</label>
+              <input x-model="partForm.qty" type="number" min="0" />
+            </div>
+            <div class="field">
+              <label>Reorder Point</label>
+              <input x-model="partForm.reorder_point" type="number" min="0" />
+              <span class="field-hint">Alert when stock hits this</span>
+            </div>
+            <div class="field">
+              <label>Unit Cost</label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="partForm.cost" type="number" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Sell Price</label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="partForm.sell_price" type="number" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Vendor &amp; Location</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Vendor</label>
+              <select x-model="partForm.vendor_id">
+                <option value="">No Vendor</option>
+                <template x-for="v in inventoryVendors" :key="v.id">
+                  <option :value="v.id" x-text="v.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="field">
+              <label>Shelf Location</label>
+              <input x-model="partForm.location" type="text" placeholder="e.g. A-12" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Notes</div>
+          <div class="field">
+            <textarea x-model="partForm.notes" rows="3" placeholder="Additional details…"></textarea>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button class="btn btn-primary" @click="panelMode === 'new' ? submitPart() : savePart()"
+            x-text="panelMode === 'new' ? 'Add Part' : 'Save Changes'"></button>
+          <button class="btn btn-ghost" @click="closePanel()">Cancel</button>
+          <button class="btn btn-danger btn-sm ml-auto"
+            x-show="panelMode === 'edit'" @click="deletePart()">Delete Part</button>
+        </div>
+
+      </div>
+    </div>
+  </div>

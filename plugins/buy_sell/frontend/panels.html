@@ -1,0 +1,114 @@
+<!-- ════════════════════════════════════════════════════════════════════════
+       BUY/SELL DETAIL / EDIT PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <style>
+    .panel-overlay {
+      background: rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(4px) !important;
+      -webkit-backdrop-filter: blur(4px) !important;
+    }
+    .panel-content {
+      width: 640px !important;
+      background: rgba(var(--surface-rgb), 0.85) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border-left: 1px solid var(--border) !important;
+    }
+    .panel-head {
+      background: transparent !important;
+    }
+  </style>
+  <div class="panel-overlay" x-show="panel === 'buysell'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content">
+      <div class="panel-head">
+        <span class="panel-title" x-text="panelMode === 'new' ? 'Add New Product' : 'Edit Product'"></span>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+      <div class="panel-body">
+
+        <div class="form-section">
+          <div class="form-section-title">Product Information</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Product Name <span style="color:var(--red)">*</span></label>
+              <input x-model="bsForm.device" type="text" placeholder="e.g. iPhone 13 Pro 256GB" required />
+            </div>
+            <div class="form-grid form-grid-2">
+              <div class="field">
+                <label>Condition</label>
+                <select x-model="bsForm.condition">
+                  <option>New</option>
+                  <option>Excellent</option>
+                  <option>Good</option>
+                  <option>Fair</option>
+                  <option>Poor / Parts</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Status</label>
+                <select x-model="bsForm.status">
+                  <option>Staging</option>
+                  <option>Ready for Sale</option>
+                  <option>Sold</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Financials</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Purchase Price</label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="bsForm.purchase_price" type="number" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Sell Price</label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="bsForm.sell_price" type="number" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+            <div class="field" x-show="bsForm.status === 'Sold'">
+              <label>Date Sold</label>
+              <input x-model="bsForm.date_sold" type="date" placeholder="YYYY-MM-DD" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Customer (Seller/Buyer)</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Customer Name</label>
+              <input x-model="bsForm.customer_name" type="text" />
+            </div>
+            <div class="field">
+              <label>Customer Phone</label>
+              <input x-model="bsForm.customer_phone" type="text" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Notes</div>
+          <div class="field">
+            <textarea x-model="bsForm.notes" rows="3" placeholder="Additional details…"></textarea>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" @click="panelMode === 'new' ? submitDevice() : saveDevice()"
+            x-text="panelMode === 'new' ? 'Add Product' : 'Save Changes'"></button>
+          <button class="btn btn-ghost" @click="closePanel()">Cancel</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:auto"
+            x-show="panelMode === 'edit'" @click="deleteDevice()">Delete Product</button>
+        </div>
+
+      </div>
+    </div>
+  </div>

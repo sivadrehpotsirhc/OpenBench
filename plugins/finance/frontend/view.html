@@ -1,0 +1,120 @@
+<!-- ════════════════════════════════════════════════════════════════════
+         FINANCE TAB
+    ═════════════════════════════════════════════════════════════════════ -->
+    <div class="plugin-view">
+      <style>
+        .range-selector {
+          display: flex;
+          gap: 8px;
+        }
+        .range-btn {
+          padding: 4px 12px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          text-align: center;
+          border: 1px solid var(--border);
+          background: var(--bg);
+          color: var(--textdim);
+          transition: all var(--transition-fast);
+        }
+        .range-btn:hover {
+          border-color: var(--border2);
+          color: var(--text);
+        }
+        .range-btn.sel {
+          border-color: var(--accent);
+          color: var(--accent);
+          background: rgba(59, 130, 246, 0.08);
+        }
+      </style>
+      <div class="section-head">
+        <span class="section-title">Financial Overview</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="range-selector" style="margin-right:12px">
+            <button class="range-btn"
+              :class="finRange==='week' && 'sel'" @click="finRange='week'; fetchFinanceSummary()">This Week</button>
+            <button class="range-btn"
+              :class="finRange==='all' && 'sel'" @click="finRange='all'; fetchFinanceSummary()">All-Time</button>
+          </div>
+          <button class="btn btn-ghost" @click="exportFinance()"> Export CSV</button>
+          <button class="btn btn-primary" @click="openNewExpense()">+ Add Expense</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--green)" x-text="'$' + parseFloat(finSummary.total_revenue || 0).toLocaleString(undefined, {minimumFractionDigits:2})"></div>
+          <div class="stat-label">Total Revenue</div>
+          <div class="tdim" style="margin-top:4px">
+            <span x-text="'$' + parseFloat(finSummary.repair_revenue || 0).toLocaleString()"></span> Repairs +
+            <span x-text="'$' + parseFloat(finSummary.device_revenue || 0).toLocaleString()"></span> Sales
+          </div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--red)" x-text="'$' + parseFloat(finSummary.total_cost || 0).toLocaleString(undefined, {minimumFractionDigits:2})"></div>
+          <div class="stat-label">Total Costs</div>
+          <div class="tdim" style="margin-top:4px">
+            <span x-text="'$' + parseFloat(finSummary.device_cost || 0).toLocaleString()"></span> COGS +
+            <span x-text="'$' + parseFloat(finSummary.expense_total || 0).toLocaleString()"></span> Expenses
+          </div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" :style="finSummary.net_profit >= 0 ? 'color:var(--green)' : 'color:var(--red)'"
+               x-text="'$' + parseFloat(finSummary.net_profit || 0).toLocaleString(undefined, {minimumFractionDigits:2})"></div>
+          <div class="stat-label">Net Profit</div>
+          <div class="tdim" style="margin-top:4px" x-text="finSummary.repair_count + ' repairs, ' + finSummary.device_count + ' sales'"></div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <span class="section-title tdim">Expense Log</span>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="sortable" @click="toggleExpenseSort('date')" :aria-sort="expenseSortBy === 'date' ? (expenseSortDesc ? 'descending' : 'ascending') : 'none'">
+                Date <span x-show="expenseSortBy === 'date'" x-text="expenseSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleExpenseSort('description')" :aria-sort="expenseSortBy === 'description' ? (expenseSortDesc ? 'descending' : 'ascending') : 'none'">
+                Description <span x-show="expenseSortBy === 'description'" x-text="expenseSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleExpenseSort('category')" :aria-sort="expenseSortBy === 'category' ? (expenseSortDesc ? 'descending' : 'ascending') : 'none'">
+                Category <span x-show="expenseSortBy === 'category'" x-text="expenseSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleExpenseSort('source')" :aria-sort="expenseSortBy === 'source' ? (expenseSortDesc ? 'descending' : 'ascending') : 'none'">
+                Source <span x-show="expenseSortBy === 'source'" x-text="expenseSortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleExpenseSort('amount')" :aria-sort="expenseSortBy === 'amount' ? (expenseSortDesc ? 'descending' : 'ascending') : 'none'" style="text-align:right;padding-right:20px">
+                Amount <span x-show="expenseSortBy === 'amount'" x-text="expenseSortDesc ? '▼' : '▲'"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="expenses.length === 0">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <div class="empty-icon"></div>
+                    <p>No expenses recorded yet.</p>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <template x-for="e in expenses" :key="e.id">
+              <tr @click="openExpense(e)">
+                <td class="tdim mono" x-text="e.date"></td>
+                <td class="tname" x-text="e.description"></td>
+                <td class="tdim" x-text="e.category"></td>
+                <td class="tdim" x-text="e.source"></td>
+                <td class="mono" style="color:var(--red);text-align:right;padding-right:20px"
+                    x-text="'-$' + parseFloat(e.amount).toFixed(2)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>

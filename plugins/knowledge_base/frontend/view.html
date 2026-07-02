@@ -1,0 +1,105 @@
+<!-- ════════════════════════════════════════════════════════════════════
+         KNOWLEDGE BASE TAB
+     ═════════════════════════════════════════════════════════════════════ -->
+<div class="plugin-view" x-data="knowledgeBasePlugin()" x-init="init()">
+  <div class="section-head">
+    <div class="flex items-center gap-2">
+      <span class="section-title">Knowledge Base</span>
+      <span class="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface2)] text-[var(--textdim)] font-mono border border-[var(--border)]" x-text="entries.length + ' entries'"></span>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost" @click="syncNow()" :disabled="isSyncing" style="display: flex; align-items: center; gap: 6px">
+        <template x-if="isSyncing">
+          <span class="animate-spin" style="display:inline-block; width:12px; height:12px; border:2px solid var(--textdim); border-radius:50%; border-top-color:transparent"></span>
+        </template>
+        <span x-text="isSyncing ? 'Syncing...' : 'Sync Tickets'"></span>
+      </button>
+      <button class="btn btn-primary" @click="openNew()">+ Add Entry</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input class="search-box" x-model="search"
+      @input.debounce.300ms="fetchEntries()"
+      type="text" placeholder="Search by device, problem, or resolution…" />
+  </div>
+
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 25%">Device</th>
+          <th style="width: 35%">Problem / Issue</th>
+          <th style="width: 40%">Resolution / Solution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-if="entries.length === 0">
+          <tr>
+            <td colspan="3">
+              <div class="empty-state">
+                <div class="empty-icon"></div>
+                <p>No knowledge bites found.</p>
+                <p style="font-size:12px; color:var(--textdim); margin-top:4px">
+                  Click <strong>Sync Tickets</strong> to import resolution logs from your completed repair tickets, or add one manually!
+                </p>
+              </div>
+            </td>
+          </tr>
+        </template>
+        <template x-for="e in entries" :key="e.id">
+          <tr @click="openEdit(e)" style="cursor: pointer">
+            <td>
+              <div class="tname" x-text="e.device"></div>
+              <div class="tdim font-mono text-[10px] mt-1" x-text="e.created_at"></div>
+            </td>
+            <td style="white-space: pre-wrap; vertical-align: top" x-text="e.problem"></td>
+            <td class="tdim" style="white-space: pre-wrap; vertical-align: top" x-text="e.solution"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Detail / Edit Slide-over Panel -->
+  <div class="panel-overlay" x-show="panelOpen" @click.self="closePanel()" x-cloak style="display: none;">
+    <div class="panel-content drawer">
+      <div class="panel-head" style="background: rgba(var(--surface-rgb), 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+        <span class="panel-title" x-text="panelMode === 'new' ? 'Add Knowledge Bite' : 'Edit Knowledge Bite'"></span>
+        <button class="close-btn" @click="closePanel()">x</button>
+      </div>
+      <div class="panel-body">
+        
+        <div class="form-section">
+          <div class="form-section-title">Knowledge Bite Details</div>
+          
+          <div class="form-grid form-grid-2">
+            <div class="field" style="grid-column:span 2">
+              <label>Device / Model <span style="color:var(--red)">*</span></label>
+              <input x-model="form.device" type="text" placeholder="e.g. iPhone 13, MacBook Pro M1, Dell XPS 15" required />
+            </div>
+            
+            <div class="field" style="grid-column:span 2">
+              <label>Problem Description <span style="color:var(--red)">*</span></label>
+              <textarea x-model="form.problem" rows="3" placeholder="Symptom, diagnosis details, or customer complaint..." required></textarea>
+            </div>
+
+            <div class="field" style="grid-column:span 2">
+              <label>Resolution / Solution <span style="color:var(--red)">*</span></label>
+              <textarea x-model="form.solution" rows="6" placeholder="Consolidated fix, parts replaced, diagnostic notes..." required></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:24px">
+          <button class="btn btn-primary" @click="submitForm()"
+            x-text="panelMode === 'new' ? 'Save Entry' : 'Save Changes'"></button>
+          <button class="btn btn-ghost" @click="closePanel()">Cancel</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:auto"
+            x-show="panelMode === 'edit'" @click="deleteEntry()">Delete Entry</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,16 @@
+{
+  "id": "software-repo",
+  "name": "Software Repository",
+  "version": "1.0.0",
+  "prefix": "/app/tools",
+  "entry_points": {
+    "backend": "routes.py",
+    "db_init": "db.py"
+  },
+  "tables": [
+    "tool_categories",
+    "tools",
+    "tool_sessions",
+    "tool_downloads"
+  ]
+}

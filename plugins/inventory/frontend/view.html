@@ -1,0 +1,93 @@
+<!-- ════════════════════════════════════════════════════════════════════
+         INVENTORY TAB
+    ═════════════════════════════════════════════════════════════════════ -->
+    <div class="plugin-view">
+      <div class="section-head">
+        <span class="section-title">Parts Inventory</span>
+        <button class="btn btn-primary" @click="openNewPart()">+ Add Part</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--blue)" x-text="invStats.total_parts ?? '—'"></div>
+          <div class="stat-label">Total Parts</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--red)" x-text="invStats.low_stock ?? '—'"></div>
+          <div class="stat-label">Low Stock</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-value" style="color:var(--green)" x-text="invStats.total_value ?? '—'"></div>
+          <div class="stat-label">Stock Value</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input class="search-box" x-model="inventorySearch"
+          @input.debounce.300ms="fetchParts()"
+          type="text" placeholder="Search parts, SKU, category…" />
+        <label class="check-row ml-3">
+          <input type="checkbox" x-model="inventoryLowStock" @change="fetchParts()" />
+          <span>Low Stock Only</span>
+        </label>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="sortable" @click="toggleInventorySort('name')" :aria-sort="inventorySortBy === 'name' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                Part Name <span x-show="inventorySortBy === 'name'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('sku')" :aria-sort="inventorySortBy === 'sku' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                SKU <span x-show="inventorySortBy === 'sku'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('category')" :aria-sort="inventorySortBy === 'category' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                Category <span x-show="inventorySortBy === 'category'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('qty')" :aria-sort="inventorySortBy === 'qty' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                In Stock <span x-show="inventorySortBy === 'qty'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('reorder_point')" :aria-sort="inventorySortBy === 'reorder_point' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                Reorder <span x-show="inventorySortBy === 'reorder_point'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('cost')" :aria-sort="inventorySortBy === 'cost' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                Cost <span x-show="inventorySortBy === 'cost'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('sell_price')" :aria-sort="inventorySortBy === 'sell_price' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                Price <span x-show="inventorySortBy === 'sell_price'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+              <th class="sortable" @click="toggleInventorySort('vendor_name')" :aria-sort="inventorySortBy === 'vendor_name' ? (inventorySortDesc ? 'descending' : 'ascending') : 'none'">
+                Vendor <span x-show="inventorySortBy === 'vendor_name'" x-text="inventorySortDesc ? '▼' : '▲'"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="inventoryParts.length === 0">
+              <tr>
+                <td colspan="8">
+                  <div class="empty-state">
+                    <div class="empty-icon"></div>
+                    <p>No parts found in inventory.</p>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <template x-for="p in inventoryParts" :key="p.id">
+              <tr @click="openPart(p)">
+                <td class="tname" x-text="p.name"></td>
+                <td class="tdim mono" x-text="p.sku || '—'"></td>
+                <td class="tdim" x-text="p.category || '—'"></td>
+                <td>
+                  <span :style="p.qty <= p.reorder_point ? 'color:var(--red);font-weight:600' : ''"
+                        x-text="p.qty"></span>
+                </td>
+                <td class="tdim" x-text="p.reorder_point"></td>
+                <td class="tdim mono" x-text="p.cost ? '$' + parseFloat(p.cost).toFixed(2) : '—'"></td>
+                <td class="price-cell" x-text="p.sell_price ? '$' + parseFloat(p.sell_price).toFixed(2) : '—'"></td>
+                <td class="tdim" x-text="p.vendor_name || '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>

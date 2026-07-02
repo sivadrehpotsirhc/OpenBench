@@ -1,0 +1,66 @@
+<!-- ════════════════════════════════════════════════════════════════════════
+       EXPENSE DETAIL / EDIT PANEL
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="panel-overlay" x-show="panel === 'expense'" @click.self="closePanel()" x-cloak>
+    <div class="panel-content drawer">
+      <div class="panel-head">
+        <span class="panel-title" x-text="panelMode === 'new' ? 'Add New Expense' : 'Edit Expense'"></span>
+        <button class="close-btn" @click="closePanel()"></button>
+      </div>
+      <div class="panel-body">
+
+        <div class="form-section">
+          <div class="form-section-title">Expense Details</div>
+          <div class="form-grid form-grid-2">
+            <div class="field" style="grid-column: span 2">
+              <label>Description <span style="color:var(--red)">*</span></label>
+              <input x-model="expenseForm.description" type="text" placeholder="e.g. Monthly Rent" required />
+            </div>
+            <div class="field">
+              <label>Date</label>
+              <input x-model="expenseForm.date" type="date" required />
+            </div>
+            <div class="field">
+              <label>Amount <span style="color:var(--red)">*</span></label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix">$</span>
+                <input x-model="expenseForm.amount" type="number" step="0.01" placeholder="0.00" required />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Categorization</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Category</label>
+              <select x-model="expenseForm.category">
+                <template x-for="c in FINANCE_CATEGORIES" :key="c"><option x-text="c"></option></template>
+              </select>
+            </div>
+            <div class="field">
+              <label>Source</label>
+              <input x-model="expenseForm.source" type="text" placeholder="e.g. Bank Account" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Notes</div>
+          <div class="field">
+            <textarea x-model="expenseForm.notes" rows="3" placeholder="Additional details…"></textarea>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" @click="panelMode === 'new' ? submitExpense() : saveExpense()"
+            x-text="panelMode === 'new' ? 'Add Expense' : 'Save Changes'"></button>
+          <button class="btn btn-ghost" @click="closePanel()">Cancel</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:auto"
+            x-show="panelMode === 'edit'" @click="deleteExpense()">Delete Expense</button>
+        </div>
+
+      </div>
+    </div>
+  </div>

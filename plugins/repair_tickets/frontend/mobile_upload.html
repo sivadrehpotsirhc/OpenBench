@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Upload Ticket Photo</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <style>
+    body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      box-sizing: border-box;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      border: 1px solid var(--border);
+    }
+    h1 {
+      font-size: 20px;
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+    p {
+      color: var(--textdim);
+      font-size: 14px;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 16px;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+    }
+    .btn:active {
+      opacity: 0.8;
+    }
+    .btn-secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    input[type="file"] {
+      display: none;
+    }
+    #preview-container {
+      display: none;
+      margin-bottom: 24px;
+    }
+    #preview-image {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      max-height: 300px;
+      object-fit: contain;
+    }
+    .success {
+      color: var(--green);
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="app">
+    <div id="step-upload">
+      <h1>Upload Photo</h1>
+      <p>Attach a photo to the repair ticket.</p>
+      
+      <div id="preview-container">
+        <img id="preview-image" src="" alt="Preview">
+      </div>
+ 
+      <!-- capture="environment" tries to open the back camera directly -->
+      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <button class="btn" id="btn-take" onclick="document.getElementById('file-input').click()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>Take Photo
+      </button>
+      
+      <input type="file" id="file-input-gallery" accept="image/*">
+      <button class="btn btn-secondary" id="btn-gallery" onclick="document.getElementById('file-input-gallery').click()">
+         Choose from Gallery
+      </button>
+ 
+      <button class="btn" id="btn-submit" style="display:none; background: var(--green);" onclick="submitPhoto()">
+         Upload Photo
+      </button>
+      <button class="btn btn-secondary" id="btn-cancel" style="display:none;" onclick="cancelSelection()">
+        Cancel
+      </button>
+    </div>
+ 
+    <div id="step-success" style="display:none;">
+      <h1 class="success">Uploaded!</h1>
+      <p>The photo has been added to the ticket. You can upload another photo or close this page.</p>
+      <button class="btn btn-secondary" onclick="resetForm()">Upload Another</button>
+    </div>
+ 
+    <div id="step-error" style="display:none;">
+      <h1 style="color: var(--red);">Session Expired</h1>
+      <p>This upload session has expired or is invalid. Please generate a new QR code on the computer.</p>
+    </div>
+  </div>
+
+  <script>
+    // The token is part of the URL path: /photo-upload/{token}
+    const token = window.location.pathname.split('/').pop();
+    let selectedFile = null;
+
+    const fileInput = document.getElementById('file-input');
+    const fileInputGallery = document.getElementById('file-input-gallery');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImage = document.getElementById('preview-image');
+    
+    const btnTake = document.getElementById('btn-take');
+    const btnGallery = document.getElementById('btn-gallery');
+    const btnSubmit = document.getElementById('btn-submit');
+    const btnCancel = document.getElementById('btn-cancel');
+
+    function handleFileSelect(e) {
+      if (!e.target.files || e.target.files.length === 0) return;
+      selectedFile = e.target.files[0];
+      
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        previewImage.src = evt.target.result;
+        previewContainer.style.display = 'block';
+        
+        btnTake.style.display = 'none';
+        btnGallery.style.display = 'none';
+        btnSubmit.style.display = 'inline-block';
+        btnCancel.style.display = 'inline-block';
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+
+    fileInput.addEventListener('change', handleFileSelect);
+    fileInputGallery.addEventListener('change', handleFileSelect);
+
+    function cancelSelection() {
+      selectedFile = null;
+      fileInput.value = '';
+      fileInputGallery.value = '';
+      previewContainer.style.display = 'none';
+      previewImage.src = '';
+      
+      btnTake.style.display = 'inline-block';
+      btnGallery.style.display = 'inline-block';
+      btnSubmit.style.display = 'none';
+      btnCancel.style.display = 'none';
+    }
+
+    function resetForm() {
+      cancelSelection();
+      document.getElementById('step-success').style.display = 'none';
+      document.getElementById('step-upload').style.display = 'block';
+    }
+
+    async function submitPhoto() {
+      if (!selectedFile) return;
+      
+      btnSubmit.innerText = 'Uploading...';
+      btnSubmit.disabled = true;
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const res = await fetch(`/photo-upload/${token}/submit`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (res.ok) {
+          document.getElementById('step-upload').style.display = 'none';
+          document.getElementById('step-success').style.display = 'block';
+        } else {
+          document.getElementById('step-upload').style.display = 'none';
+          document.getElementById('step-error').style.display = 'block';
+        }
+      } catch (err) {
+        alert("Upload failed. Please try again.");
+      } finally {
+        btnSubmit.innerText = ' Upload Photo';
+        btnSubmit.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

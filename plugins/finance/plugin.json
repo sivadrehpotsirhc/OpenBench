@@ -1,0 +1,9 @@
+{
+  "id": "finance",
+  "name": "Finance",
+  "version": "1.0.0",
+  "entry_points": {
+    "backend": "routes.py",
+    "db_init": "db.py"
+  }
+}
